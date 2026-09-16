@@ -11,6 +11,7 @@ Fits statistical models to detect microbial strains associated with a phenotype.
 Useful links:
 \itemize{
   \item \url{https://github.com/gtonkinhill/strainspy}
+  \item \url{https://sudaraka88.r-universe.dev/strainspy}
   \item Report bugs at \url{https://github.com/gtonkinhill/strainspy/issues}
 }
 

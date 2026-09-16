@@ -59,7 +59,7 @@ ss_fit_zib <- local({
         d$se_filtered[1:20, ],
         design,
         nthreads = 1,
-        return_vcov = FALSE
+        return_vcov = TRUE
       )
     )
 
@@ -108,6 +108,74 @@ ss_fit_qb <- local({
       nthreads = 1
     )
 
+    cache
+  }
+})
+
+ss_priors_eb <- local({
+  cache <- NULL
+
+  function() {
+    if (!is.null(cache)) {
+      return(cache)
+    }
+
+    d <- ss_test_data()
+    design <- stats::as.formula("~ Case_status + Age_at_collection")
+
+    cache <<- suppressWarnings(
+      strainspy::compute_eb_priors(
+        d$se_filtered[1:10, ],
+        design,
+        nthreads = 1,
+        progress = FALSE
+      )
+    )
+
+    cache
+  }
+})
+
+# Simulated ANI data with a known planted effect. Rows `planted` have lower
+# identity and more zeros in PD than in Control; rows `nulls` are drawn from
+# the same distribution in both groups. Built on top of a real fixture so the
+# SummarizedExperiment carries the rowData/colData the fitters expect.
+ss_sim <- local({
+  cache <- NULL
+
+  function() {
+    if (!is.null(cache)) {
+      return(cache)
+    }
+
+    d <- ss_test_data()
+    se <- d$se_filtered[1:12, ]
+    grp <- SummarizedExperiment::colData(se)$Case_status
+    planted <- 1:6
+    nulls <- 7:12
+
+    # ~98% identity, present in roughly half the samples (values in [0, 1])
+    set.seed(42)
+    base <- function(n) stats::rbeta(n, 200, 4) * stats::rbinom(n, 1, 0.5)
+
+    mat <- matrix(0, nrow(se), ncol(se),
+                  dimnames = dimnames(SummarizedExperiment::assay(se)))
+    for (i in planted) {
+      mat[i, grp == "Control"] <- base(sum(grp == "Control")) * 100
+      mat[i, grp == "PD"] <- strainspy:::rescale_beta(
+        base(sum(grp == "PD")), beta = 0.99, zi = 0.15
+      )$rescaled * 100
+    }
+    for (i in nulls) {
+      mat[i, ] <- base(ncol(se)) * 100
+    }
+    SummarizedExperiment::assay(se, 1) <- mat
+
+    fit <- suppressWarnings(
+      strainspy::glmZiBFit(se, ~ Case_status, nthreads = 1, progress = FALSE)
+    )
+
+    cache <<- list(se = se, fit = fit, planted = planted, nulls = nulls)
     cache
   }
 })

@@ -1,7 +1,7 @@
 Package: strainspy
 Type: Package
 Title: Strain Level Microbiome Wide Association Studies
-Version: 0.99.1
+Version: 0.99.2
 Depends: R (>= 4.1.0)
 Authors@R: c(
     person(given = "Gerry", family = "Tonkin-Hill",

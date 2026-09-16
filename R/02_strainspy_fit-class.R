@@ -175,23 +175,6 @@ methods::setMethod("getResiduals", "strainspy_fit", function(object) {
   object@residuals
 })
 
-#' Access False Discovery Rates (FDR)
-#'
-#' Returns the false discovery rates (FDR) from a `strainspy_fit` object, if available.
-#'
-#' @param object An object of class `strainspy_fit`.
-#' @return A `DataFrame` or `NULL` containing FDR values.
-#' @examples
-#' methods::hasMethod("getFDR", "strainspy_fit")
-#' @export
-methods::setGeneric("getFDR", function(object) methods::standardGeneric("getFDR"))
-
-#' @rdname getFDR
-#' @export
-methods::setMethod("getFDR", "strainspy_fit", function(object) {
-  object@fdr
-})
-
 #' Summary Method for strainspy_fit
 #'
 #' Provides a high-level summary of a `strainspy_fit` object, including its call,

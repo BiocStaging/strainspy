@@ -1,5 +1,15 @@
 # strainspy news
 
+## strainspy 0.99.2
+
+Minor bug fixes and documentation updates.
+
+- Added installation instructions to `README` for `R-universe` and `Bioconda`
+- Added tests to improve coverage of `simulation_helpers.R` and others.
+- Removed redundant `getFDR()` function from `strainspy_fit-class.R` and
+  documentation.
+  
+
 ## strainspy 0.99.1
 
 ### Bug fixes

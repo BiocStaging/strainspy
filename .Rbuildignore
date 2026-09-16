@@ -14,3 +14,4 @@
 ^.*\.BiocCheck$
 ^.*\.tar\.gz$
 ^\.gitignore$
+^\.covrignore$
