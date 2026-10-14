@@ -7,14 +7,14 @@
 #' 
 #' @param se SummarizedExperiment. A `SummarizedExperiment` object containing the assay data and metadata.
 #' @param design Formula. A formula to specify the fixed and random effects, e.g., ` ~ Group + (1|Sample)`.
-#' @param nthreads An integer specifying the number of (CPUs or workers) to use. Defaults to one 1.
+#' @param nthreads An integer specifying the number of (CPUs or workers) to use. Defaults to 1.
 #' @param scale_continuous Logical. If `TRUE`, all numeric columns in `colData(se)` are z-score standardized (mean = 0, SD = 1). Defaults to `TRUE`.
 #' @param transform If data is already transformed, set to `NULL` (default). Supported options: arcsin transform `arcsin` or centered log ratio `CLR`. `CLR` requires `compositions` package.
 #' @param BPPARAM Optional `BiocParallelParam` object. If not provided, the function will configure an appropriate backend automatically.
 #' @param progress Logical. If `TRUE` (default), progress bars and progress messages are printed. Set to `FALSE` to silence them.
 #'
 #' @return A `strainspy_fit` object with the following components:
-#' \item{row_data}{A DFrame with 6 slots with feature details}
+#' \item{row_data}{The `rowData` of `se` for the fitted features}
 #' \item{coefficients}{A DFrame with coefficients for each feature}
 #' \item{std_errors}{A DFrame of standard errors for each feature}
 #' \item{p_values}{A DFrame of p-values for each feature}
@@ -50,36 +50,19 @@
 abundanceFit <- function(se, design, nthreads=1, scale_continuous=TRUE, transform=NULL, BPPARAM=NULL,
                          progress=TRUE) {
   check_progress(progress)
-  # Check if glmmTMB is installed
-  if (!requireNamespace("lmerTest", quietly = TRUE)) {
-    stop("The 'lmerTest' package is required but is not installed. Please install it with install.packages('lmerTest').")
-  }
-  
   # Validate input
   if (!inherits(se, "SummarizedExperiment")) {
     stop("`se` must be a SummarizedExperiment object.")
   }
   
-  # colData (sample metadata)
+  # Sample metadata from colData
   col_data <- as.data.frame(SummarizedExperiment::colData(se))
   if (scale_continuous==TRUE){
-    for (col in names(col_data)) {
-      if (is.numeric(col_data[[col]])) {
-        col_data[[col]] <- as.numeric(scale(col_data[[col]]))  # Scale numeric columnsa + convert from matrix to vector (we are guaranteed to go col by col)
-      }
-    }
+    col_data <- scale_numeric_columns(col_data, as_vector = TRUE)  # plain vectors for lmer
   }
   
-  # Ensure the design is a formula
-  if (!inherits(design, "formula")) {
-    stop("`design` must be a formula (e.g., ~ batch + condition).")
-  }
-  
-  # check if formula is valid
-  nbd = nobars_(design)
-  if(is.null(nbd)){
-    stop(paste(paste(design, collapse = ''), "--- is not a valid formula."))
-  } 
+  # Ensure the design is a valid formula
+  nbd <- check_design_formula(design)
   
   combined_formula <- as.formula(paste(c("Value", as.character(design)),
                                        collapse = " "))
@@ -90,20 +73,7 @@ abundanceFit <- function(se, design, nthreads=1, scale_continuous=TRUE, transfor
   }
   
   # Set up parallel infrastructure
-  if ((nthreads > 1) & (.Platform$OS.type != "windows")) {
-    # Check the operating system and set the backend accordingly
-    if (is.null(BPPARAM)) {
-      # Use MulticoreParam for Unix-like systems
-      # BPPARAM <- BiocParallel::MulticoreParam(
-      #   workers = nthreads
-      # )
-      BPPARAM <- BiocParallel::SnowParam(workers = nthreads, progressbar = progress, tasks=100)
-    } else if (!progress) {
-      BiocParallel::bpprogressbar(BPPARAM) <- FALSE
-    }
-  } else {
-    BPPARAM <- BiocParallel::SerialParam(progressbar = progress)
-  }
+  BPPARAM <- setup_bpparam(nthreads, BPPARAM, progress, tasks = 100)
   
   # Split rows into 50-row chunks
   row_chunks <- split(
@@ -118,9 +88,7 @@ abundanceFit <- function(se, design, nthreads=1, scale_continuous=TRUE, transfor
       SummarizedExperiment::assay(se) <- as(apply(SummarizedExperiment::assay(se) , 2, function(x) asin(sqrt(x/100))), 'dgRMatrix')
       
     } else if(transform == "CLR") {
-      if (!requireNamespace("compositions", quietly = TRUE)) {
-        stop("The 'compositions' package is required for CLR transformation, but is not installed. Please install it with install.packages('compositions').")
-      }
+      require_suggested("compositions", "transform = 'CLR'")
       
       SummarizedExperiment::assay(se) <- as(apply(SummarizedExperiment::assay(se) , 2, function(x) compositions::clr(x)), 'dgRMatrix')
       
@@ -158,17 +126,17 @@ abundanceFit <- function(se, design, nthreads=1, scale_continuous=TRUE, transfor
   
   # sometimes results can be an empty list, remove those dynamically
   # Drop features whose fit failed; handles both backend failure protocols.
-  rmidx = failed_fit_index(results)
+  rmidx <- failed_fit_index(results)
   
   if(length(rmidx) > 0) {
-    seRD = SummarizedExperiment::rowData(se)[-rmidx, , drop = FALSE]
+    seRD <- SummarizedExperiment::rowData(se)[-rmidx, , drop = FALSE]
     results[rmidx] <- NULL
   } else {
-    seRD = SummarizedExperiment::rowData(se)
+    seRD <- SummarizedExperiment::rowData(se)
   }
   
   # Create the strainspy_fit object
-  p_val_idx = ncol(results[[1]]$coefficients)
+  p_val_idx <- ncol(results[[1]]$coefficients)
   
   GLM <- new("strainspy_fit",
              row_data = seRD,
@@ -180,6 +148,7 @@ abundanceFit <- function(se, design, nthreads=1, scale_continuous=TRUE, transfor
              zi_p_values = NULL,
              residuals = DataFrame(purrr::map_dfr(results, ~ .x[[3]])),
              convergence = purrr::map_lgl(results, ~ .x$convergence),
+             scale_continuous = scale_continuous,
              design = design,
              call = match.call()  # Store the function call for reproducibility
   )
@@ -198,6 +167,7 @@ abundanceFit <- function(se, design, nthreads=1, scale_continuous=TRUE, transfor
 #' @param combined_formula The formula for the conditional mean model.
 #' @return A list with model coefficients, zero-inflation coefficients, residuals,
 #'         log-likelihood, and convergence status.
+#' @noRd
 fit_lm <- function(se_subset, col_data, combined_formula) {
   
   chunk_results <- lapply(seq_len(nrow(se_subset)), function(row_index){
@@ -245,6 +215,7 @@ fit_lm <- function(se_subset, col_data, combined_formula) {
 #' @param combined_formula The formula for the conditional mean model.
 #' @return A list with model coefficients, zero-inflation coefficients, residuals,
 #'         log-likelihood, and convergence status.
+#' @noRd
 fit_lmer <- function(se_subset, col_data, combined_formula) {
   
   chunk_results <- lapply(seq_len(nrow(se_subset)), function(row_index){
@@ -280,7 +251,7 @@ fit_lmer <- function(se_subset, col_data, combined_formula) {
       residuals = stats::residuals(fit, type = "response"),
       log_likelihood = as.numeric(stats::logLik(fit)),
       # OLS usually converged when solution exists.
-      convergence = fit@optinfo$conv$opt
+      convergence = smry$optinfo$conv$opt
     ))
   })
   

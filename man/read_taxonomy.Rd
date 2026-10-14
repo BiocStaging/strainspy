@@ -2,7 +2,7 @@
 % Please edit documentation in R/read_taxonomy.R
 \name{read_taxonomy}
 \alias{read_taxonomy}
-\title{Read and process a taxonomy file in Sylph format}
+\title{Read and process a taxonomy file}
 \usage{
 read_taxonomy(file_path)
 }
@@ -10,10 +10,13 @@ read_taxonomy(file_path)
 \item{file_path}{Path to the taxonomy file.}
 }
 \value{
-A data.table containing parsed taxonomy information.
+A data.table with columns \code{Genome}, \code{Taxonomy}, \code{Domain}, \code{Phylum}, \code{Class},
+\code{Order}, \code{Family}, \code{Genus}, \code{Species} and \code{index} (the row order after sorting by lineage).
 }
 \description{
-This function reads a taxonomy file in Sylph format.
+This function reads a headerless, two-column, tab-separated taxonomy file: genome
+accession and GTDB-style lineage string (\verb{d__...;p__...;...;s__...}), as distributed
+with the sylph GTDB databases.
 }
 \examples{
 tax <- read_taxonomy(system.file("extdata", "example_taxonomy.tsv.gz", 

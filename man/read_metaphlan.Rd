@@ -14,7 +14,7 @@ read_metaphlan(
 \arguments{
 \item{file_path}{Character. Path to the merged metaphlan output file.}
 
-\item{meta_data}{data.frame. An optional tibble or data frame containing sample metadata. See Details}
+\item{meta_data}{data.frame. An optional tibble or data frame containing sample metadata. See \code{?modify_metadata} for the requirements.}
 
 \item{variable}{Character. Name of the input variable to import. Defaults to \code{relative_abundance}.}
 
@@ -28,13 +28,13 @@ A SummarizedExperiment object with the following components:
 \item{colData}{DataFrame containing information for each sample (derived from the \code{Sample_file} field).}
 }
 \description{
-This function reads a merged \code{MetaPhlAn} profile output and create a SummarizedExperiment object.
+This function reads a merged \code{MetaPhlAn} profile output and creates a SummarizedExperiment object.
 An optional metadata table can be provided and added directly to \code{colData} via an internal call to \code{modify_metadata()}.
 }
 \note{
 Since \code{MetaPhlAn} profiles are usually generated per sample, first use \code{merge_metaphlan_files()} to merge and generate the input for this function.
 
-#' If metadata is provided, it must meet the input requirements described in
+If metadata is provided, it must meet the input requirements described in
 \code{modify_metadata()}. If appending metadata fails due to pre processing requirements,
 this function will issue a detailed warning and still return the \code{SummarizedExperiment}
 object without metadata. In that case, apply necessary fixes and subsequently

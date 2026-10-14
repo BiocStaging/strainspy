@@ -52,3 +52,18 @@ testthat::test_that("distribution plotting helpers return expected object types"
   testthat::expect_s3_class(summary_tbl, "tbl_df")
   testthat::expect_true(all(c("stat", "value") %in% colnames(summary_tbl)))
 })
+
+testthat::test_that("hadjust supports bonferroni and warns on unsupported methods", {
+  d <- ss_test_data()
+  fit_z <- ss_fit_zib()
+
+  bon <- strainspy::hadjust(fit_z, coef = 2, taxonomy = d$taxonomy, method = "bonferroni")
+  testthat::expect_s3_class(bon, "tbl_df")
+  testthat::expect_true(all(c("Level", "Model", "Name", "sequence_count", "p_adjust") %in% colnames(bon)))
+
+  testthat::expect_warning(
+    holm <- strainspy::hadjust(fit_z, coef = 2, taxonomy = d$taxonomy, method = "holm"),
+    "not available for taxonomy-aware adjustment"
+  )
+  testthat::expect_equal(holm, bon)
+})

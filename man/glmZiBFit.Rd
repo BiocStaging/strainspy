@@ -22,26 +22,26 @@ glmZiBFit(
 \item{design}{Formula. A formula to specify the fixed and random effects, e.g., \code{ ~ Group + (1|Sample)}.}
 
 \item{nthreads}{An integer specifying the number of (CPUs or workers) to use. Defaults
-to one 1.}
+to 1.}
 
 \item{scale_continuous}{Logical. If \code{TRUE}, all numeric columns in \code{colData(se)} are z-score standardized (mean = 0, SD = 1). Defaults to \code{TRUE}.}
 
 \item{MAP_prior}{One of \code{strainspy_priors} object, character string (\verb{"preset_weak", "preset_strong"}),
-a \code{data.frame} of priors, or \code{NULL}. Default \code{"preset_weak"}. See Details.}
+a \code{data.frame} of priors, or \code{NULL}. Default \code{"preset_weak"}. See \code{?define_priors}.}
 
 \item{BPPARAM}{Optional \code{BiocParallelParam} object. If not provided, the function
 will configure an appropriate backend automatically.}
 
 \item{method}{Character. The method to use for fitting the model. Either 'glmmTMB' (default) or 'gamlss'.}
 
-\item{return_vcov}{Logical. Return variance-covariance matrices for each model, required for \code{estimate_effect_sizes()}.
+\item{return_vcov}{Logical. Return variance-covariance matrices for each model, required for \code{comp_ani_diff_and_posthoc_test()}.
 Disabling will result in a much smaller \code{strainspy_fit} object that is useful for most analyses. Defaults to \code{TRUE}.}
 
 \item{progress}{Logical. If \code{TRUE} (default), progress bars and progress messages are printed. Set to \code{FALSE} to silence them.}
 }
 \value{
 A \code{strainspy_fit} object with the following components:
-\item{row_data}{A DFrame with 6 slots with feature details}
+\item{row_data}{The \code{rowData} of \code{se} for the fitted features}
 \item{coefficients}{A DFrame with coefficients for each feature}
 \item{std_errors}{A DFrame of standard errors for each feature}
 \item{p_values}{A DFrame of p-values for each feature}

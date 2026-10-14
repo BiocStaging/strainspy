@@ -17,11 +17,11 @@ Useful links:
 
 }
 \author{
-\strong{Maintainer}: Sudaraka Mallawarachchi \email{smallawaarachchi@gmail.com} (\href{https://orcid.org/0000-0001-8899-3323}{ORCID})
+\strong{Maintainer}: Sudaraka Mallawaarachchi \email{smallawaarachchi@gmail.com} (\href{https://orcid.org/0000-0001-8899-3323}{ORCID})
 
 Authors:
 \itemize{
-  \item Sudaraka Mallawarachchi \email{smallawaarachchi@gmail.com} (\href{https://orcid.org/0000-0001-8899-3323}{ORCID})
+  \item Sudaraka Mallawaarachchi \email{smallawaarachchi@gmail.com} (\href{https://orcid.org/0000-0001-8899-3323}{ORCID})
   \item Gerry Tonkin-Hill \email{g.tonkinhill@gmail.com}
 }
 

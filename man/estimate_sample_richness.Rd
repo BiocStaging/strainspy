@@ -14,11 +14,11 @@ estimate_sample_richness(
 \arguments{
 \item{se}{SummarizedExperiment. A \code{SummarizedExperiment} object containing the assay data and metadata.}
 
-\item{taxonomy}{An optional taxonomy file read using \code{strainspy::read_taxonomy()}.}
+\item{taxonomy}{A taxonomy table read using \code{strainspy::read_taxonomy()} (required).}
 
 \item{ani_threshold}{Numeric ANI threshold used to define presence (default: 95).}
 
-\item{report_strain_richness}{Return the estimated strain_richness count. See description (default: FALSE)}
+\item{report_strain_richness}{Logical. Also return the strain coverage count. See description (default: FALSE)}
 }
 \value{
 A named list with:
@@ -30,7 +30,7 @@ A named list with:
 \description{
 This function estimates sample-level \strong{species richness} and
 \strong{strain coverage} using ANI-based presence/absence. A strain is
-considered present if \code{ANI > ani_threshold}.
+considered present if \code{ANI >= ani_threshold}.
 }
 \details{
 Species richness is defined as the number of species with at least
@@ -40,7 +40,7 @@ can be read in using \code{read_taxonomy()}.
 \strong{Experimental} Strain coverage is a database-dependent, normalised score
 that increases with the number of reference strains detected within a species.
 When only one strain is present for a species, it contributes 1 towards
-strain coverage. Asmore strains are detected, the contribution increases
+strain coverage. As more strains are detected, the contribution increases
 toward 2, reaching 2 when all reference strains are detected. Although this
 is designed to prevent inflation for species with many reference strains,
 this measures the \strong{coverage of reference strain space in the database},

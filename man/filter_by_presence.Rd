@@ -24,7 +24,7 @@ example_path <- system.file("extdata", "example_sylph_profile.tsv.gz",
 package = "strainspy")
 se <- read_sylph(example_path)
 
-# Filter to keep only rows with >20 non-zero entries 
+# Filter to keep only rows with at least 20 non-zero entries 
 filtered_se <- filter_by_presence(se, min_nonzero = 20)
 
 }

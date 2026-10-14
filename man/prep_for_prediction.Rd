@@ -13,14 +13,13 @@ prep_for_prediction(
 )
 }
 \arguments{
-\item{sy}{A \link[SummarizedExperiment]{SummarizedExperiment} A
-\code{SummarizedExperiment} object containing the assay data and metadata.}
+\item{sy}{A \code{SummarizedExperiment} object containing the assay data and metadata.}
 
 \item{outcome}{Character string giving the name of the outcome variable
 present in \code{colData(sy)}. This is usually the left-hand side of the
 prediction model formula.}
 
-\item{contigs}{Character vector of contigs (feature) to include as
+\item{contigs}{Character vector of contigs (features) to include as
 predictors. Must be present in \code{rownames(sy)}.}
 
 \item{covariates}{Optional character vector of additional metadata variables
@@ -28,8 +27,8 @@ to include as covariates. Default  \code{NULL} for no covariates.}
 
 \item{use_genome_names}{Bool. Use \code{Genome_file} instead of \code{Contig_name} in
 \code{colnames(output)}. \code{Genome_file} is extracted from
-\code{SummarizedExperiemnt::elementMetadata(sy)}. If not available, \code{Contig_name}
-will be used. Default \code{True}.}
+\code{SummarizedExperiment::elementMetadata(sy)}. If not available, \code{Contig_name}
+will be used. Default \code{TRUE}.}
 }
 \value{
 A \code{data.frame} containing the specified outcome variable, optional
@@ -41,7 +40,7 @@ Formats strain-level data and optional covariates into a data.frame object
 ready for modeling with \pkg{caret}. The function extracts selected contigs
 from the \code{sy} assay matrix, combines them with the specified \code{outcome} and
 optional \code{covariates} from the metadata, and performs basic validation
-and cleaning. Metadata is pulled from \code{SummarizedExperiement::colData(sy)},
+and cleaning. Metadata is pulled from \code{SummarizedExperiment::colData(sy)},
 and generally assumes \code{strainspy::modify_metadata()} was used upstream.
 }
 \details{

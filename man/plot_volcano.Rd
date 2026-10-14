@@ -2,7 +2,7 @@
 % Please edit documentation in R/plot_volcano.R
 \name{plot_volcano}
 \alias{plot_volcano}
-\title{Generate a Volcano Plot from a betaGLM Object}
+\title{Generate a Volcano Plot from a strainspy_fit Object}
 \usage{
 plot_volcano(
   object,
@@ -18,19 +18,19 @@ plot_volcano(
 \arguments{
 \item{object}{A strainspy_fit object containing model results.}
 
-\item{coef}{Integer, specifying the phenotype index of the betaGLM to extract p values and effect size for plotting. Default is 2.}
+\item{coef}{Integer, specifying the coefficient index of the fit to extract p values and effect size for plotting. Default is 2.}
 
-\item{alpha}{Float indicating signficance level. Default is 0.05}
+\item{alpha}{Float indicating significance level. Default is 0.05}
 
 \item{method}{The method for p-value adjustment. For available options, see \code{?top_hits()}. Default \code{holm}.}
 
 \item{palette}{A vector of user defined palette to colour plot. Default is the viridis palette.}
 
-\item{label}{Logical, whether to label most signifcant points of the plot with Species name.}
+\item{label}{Logical, whether to label most significant points of the plot with Species name.}
 
-\item{contig_names}{Optional character vector to replace long contig names in the plot.
+\item{contig_names}{Optional character vector of labels for the significant hits.
 Must match the length and order of \code{top_hits(object, coef = coef, alpha = alpha)$Contig_name}.
-If NULL (default), shortening will be attempted automatically.}
+If NULL (default), contig names are shortened automatically.}
 
 \item{plot}{Logical, whether to return a ggplot object (default: TRUE). If FALSE, returns the processed data.}
 }
@@ -38,7 +38,7 @@ If NULL (default), shortening will be attempted automatically.}
 A ggplot2 object if plot = TRUE, otherwise a dataframe containing the relevant statistics.
 }
 \description{
-This function creates a volcano plot from the results of a betaGLM analysis,
+This function creates a volcano plot from the results of a strainspy model fit,
 highlighting the relationship between effect size (coefficients) and statistical significance (-log10 p-values).
 }
 \examples{

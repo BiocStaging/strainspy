@@ -8,9 +8,9 @@
 #' @importFrom S4Vectors complete.cases
 #' 
 #' @param se  SummarizedExperiment. A `SummarizedExperiment` object containing the assay data and metadata.
-#' @param phenotype Any factor variable in `colnames(se@colData)`.
+#' @param phenotype Any factor variable in `colnames(colData(se))`.
 #' @param contigs A vector of contigs to generate distribution plots
-#' @param facet_phenotype Any factor variable in `colnames(se@colData)`, except `phenotype`. If provided, this will be used to facet the plot. See `?ggplot2::facet_wrap()`. Default NULL.
+#' @param facet_phenotype Any factor variable in `colnames(colData(se))`, except `phenotype`. If provided, this will be used to facet the plot. See `?ggplot2::facet_wrap()`. Default NULL.
 #' @param contig_names Optional character vector to replace long contig names in the plot.
 #' Must match the length and order of `contigs`. If NULL (default), shortening will be attempted automatically.
 #' @param show_zero_plot Bool. If TRUE, distribution of the proportion of zeros will also be plotted. Default TRUE
@@ -42,15 +42,15 @@ plot_ani_dist <- function(se, phenotype, contigs, facet_phenotype = NULL, contig
   }
   
   if(! (phenotype %in% colnames(SummarizedExperiment::colData(se))) ){
-    stop("phenotype not found in colnames(se@colData)")
+    stop("phenotype not found in colnames(colData(se))")
   }
   
-  if( ! is.factor(se@colData[[phenotype]])) {
+  if( ! is.factor(SummarizedExperiment::colData(se)[[phenotype]])) {
     stop("phenotype must be a factor")
   }
   
   if(!is.null(facet_phenotype)) {
-    facet = TRUE
+    facet <- TRUE
     
     if(phenotype == facet_phenotype){
       stop("phenotype and facet_phenotype cannnot be the same")
@@ -61,23 +61,23 @@ plot_ani_dist <- function(se, phenotype, contigs, facet_phenotype = NULL, contig
     } 
     
     if(! (facet_phenotype %in% colnames(SummarizedExperiment::colData(se))) ){
-      stop("facet_phenotype not found in colnames(se@colData)")
+      stop("facet_phenotype not found in colnames(colData(se))")
     }
     
-    if( ! is.factor(se@colData[[facet_phenotype]])) {
+    if( ! is.factor(SummarizedExperiment::colData(se)[[facet_phenotype]])) {
       stop("facet_phenotype must be a factor")
     }
   } else {
-    facet = FALSE
+    facet <- FALSE
   }
   
-  chk_contigs = contigs %in% rownames(se)
+  chk_contigs <- contigs %in% rownames(se)
   if( ! all(chk_contigs)  ){
     # Name the offending contigs in the condition itself. Printing them to
     # stdout put them on a different stream from the error on stderr, so a
     # caller could see "Above contigs" with nothing above it.
-    stop("Contigs missing from rownames(se): ",
-         paste(contigs[!chk_contigs], collapse = ", "))
+    missing_txt <- paste(contigs[!chk_contigs], collapse = ", ")
+    stop("Contigs missing from rownames(se): ", missing_txt)
   }
   
   if (!is.null(contig_names) && length(contig_names) != length(contigs)) {
@@ -85,29 +85,29 @@ plot_ani_dist <- function(se, phenotype, contigs, facet_phenotype = NULL, contig
   }
   
   if (!plot_type %in% c('violin', 'box')) {
-    plot_type = 'box'
+    plot_type <- 'box'
   }
   
   # Lazy coding, fix later - shouldn't impact speed
   if(!facet){
-    tmp = as.data.frame(t(as.matrix(SummarizedExperiment::assay(se[contigs, ]))))
-    tmp = cbind(se@colData[[phenotype]], tmp)
+    tmp <- as.data.frame(t(as.matrix(SummarizedExperiment::assay(se[contigs, ]))))
+    tmp <- cbind(SummarizedExperiment::colData(se)[[phenotype]], tmp)
     
     if(!is.null(contig_names)){
-      colnames(tmp) = c(phenotype, contig_names)
+      colnames(tmp) <- c(phenotype, contig_names)
     } else {
-      contig_names = clean_contig_names(colnames(tmp)[-1])
-      colnames(tmp) = c(phenotype, contig_names)
+      contig_names <- clean_contig_names(colnames(tmp)[-1])
+      colnames(tmp) <- c(phenotype, contig_names)
     }
   } else {
-    tmp = as.data.frame(t(as.matrix(SummarizedExperiment::assay(se[contigs, ]))))
-    tmp = cbind(se@colData[[phenotype]], se@colData[[facet_phenotype]], tmp)
+    tmp <- as.data.frame(t(as.matrix(SummarizedExperiment::assay(se[contigs, ]))))
+    tmp <- cbind(SummarizedExperiment::colData(se)[[phenotype]], SummarizedExperiment::colData(se)[[facet_phenotype]], tmp)
     
     if(!is.null(contig_names)){
-      colnames(tmp) = c(phenotype, facet_phenotype, contig_names)
+      colnames(tmp) <- c(phenotype, facet_phenotype, contig_names)
     } else {
-      contig_names = clean_contig_names(colnames(tmp)[-c(1,2)])
-      colnames(tmp) = c(phenotype, facet_phenotype, contig_names)
+      contig_names <- clean_contig_names(colnames(tmp)[-c(1,2)])
+      colnames(tmp) <- c(phenotype, facet_phenotype, contig_names)
     }
   }
   
@@ -131,13 +131,13 @@ plot_ani_dist <- function(se, phenotype, contigs, facet_phenotype = NULL, contig
     )
   }
   
-  df_long$Contig = factor(df_long$Contig, levels = contig_names)
+  df_long$Contig <- factor(df_long$Contig, levels = contig_names)
   
   # Handle NAs first
-  cmpcases = complete.cases(df_long)
+  cmpcases <- complete.cases(df_long)
   
   if(any(cmpcases == FALSE)){
-    df_long = df_long[which(cmpcases), ]
+    df_long <- df_long[which(cmpcases), ]
     
     if(nrow(df_long) == 0) {
       stop("All entries contain incomplete entries, unable to plot")
@@ -175,9 +175,9 @@ plot_ani_dist <- function(se, phenotype, contigs, facet_phenotype = NULL, contig
     # just return the data.frame
     return(df_long)
   } else {
-    df_long$ANI[df_long$ANI == 0] = NA
+    df_long$ANI[df_long$ANI == 0] <- NA
     
-    df_long$Contig = factor(df_long$Contig)
+    df_long$Contig <- factor(df_long$Contig)
     phenotype_ <- rlang::sym(phenotype)
     
     phen_levels <- levels(factor(df_long[[phenotype]]))
@@ -215,7 +215,7 @@ plot_ani_dist <- function(se, phenotype, contigs, facet_phenotype = NULL, contig
     }
     
     if(show_zero_plot){
-      p_p = list()
+      p_p <- list()
       p_p[[1]] <- p  +
         ggplot2::theme(axis.text.x = ggplot2::element_blank(),       
                        axis.ticks.x = ggplot2::element_blank(),      
@@ -257,11 +257,11 @@ plot_ani_dist <- function(se, phenotype, contigs, facet_phenotype = NULL, contig
 #' @importFrom methods is
 #'
 #' @param se  SummarizedExperiment. A `SummarizedExperiment` object containing the assay data and metadata.
-#' @param phenotype One variable in `colnames(se@colData)`, except `Sample_File`. The selected variable must be categorical
+#' @param phenotype One variable in `colnames(colData(se))`, except `Sample_file`. The selected variable must be categorical
 #' @param contig Contig name to visualise
 #' @param bins Numeric. Number of bins to plot the histogram. This parameter should be adjusted to properly visualise the ANI differences. Default 250 
-#' @param drop_zeros Bool. If TRUE, ANI or Abundance 0 values will not be included in the violin plot. Default FALSE
-#' @param show_quantiles Bool. If TRUE, min, max, etc. will be shown as vertical lines. Default TRUE
+#' @param drop_zeros Bool. If TRUE, ANI or Abundance 0 values will not be included in the histogram. Default FALSE
+#' @param show_quantiles Bool. If TRUE, the minimum, first quartile, median, mean, third quartile and maximum are shown as vertical lines. Default TRUE
 #' @param fit_spline Bool. If TRUE, a spline will be fitted to each histogram. Default FALSE 
 #' @param fit_control Numeric. Smaller values increase the smoothness of the fitted spline. Default 100
 #' @param separate_facets Bool. If TRUE, each category of the phenotype will be plotted in a separate facet. Default TRUE 
@@ -343,9 +343,7 @@ plot_histogram <- function(se, phenotype, contig,
   
   if (fit_spline) {
     
-    if (!requireNamespace("mgcv", quietly = TRUE)) {
-      stop("For fit_spline = TRUE, package 'mgcv' is required.")
-    }
+    require_suggested("mgcv", "fit_spline = TRUE")
     
     spline_df <- dat %>%
       dplyr::group_by(.data[[phenotype]]) %>%

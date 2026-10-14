@@ -21,7 +21,7 @@ and zero-inflated beta model fitting using \code{glmmTMB}.
 
 \item{\code{boot_disp}}{Numeric matrix. Bootstrap mean and SD values for the dispersion term of beta component.}
 
-\item{\code{design}}{The formula with with effect terms used}
+\item{\code{design}}{The formula with the effect terms used}
 
 \item{\code{call}}{The matched call of the model.}
 }}

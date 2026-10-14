@@ -21,16 +21,16 @@ glmObFit(
 \item{design}{Formula. A formula to specify the fixed and random effects, e.g., \code{ ~ Group + (1|Sample)}.}
 
 \item{nthreads}{An integer specifying the number of (CPUs or workers) to use. Defaults
-to one 1.}
+to 1.}
 
 \item{scale_continuous}{Logical. If \code{TRUE}, all numeric columns in \code{colData(se)}
-are z-score standardized (mean = 0, SD = 1). Defaults to \code{FALSE}.}
+are z-score standardized (mean = 0, SD = 1). Defaults to \code{TRUE}.}
 
 \item{MAP_prior}{One of \code{strainspy_priors} object, character string (\verb{"preset_weak", "preset_strong"}),
 a \code{data.frame} of priors, or \code{NULL}. Default \code{"preset_weak"}. See Details.}
 
 \item{family}{A \code{glmmTMB} family object. Defaults to \code{glmmTMB::ordbeta()}.
-For general use, leave this at default Advanced users can experiment with others families in \code{?glmmTMB::family_glmmTMB}}
+For general use, leave this at the default. Advanced users can experiment with other families in \code{?glmmTMB::family_glmmTMB}}
 
 \item{BPPARAM}{Optional \code{BiocParallelParam} object. If not provided, the function
 will configure an appropriate backend automatically.}
@@ -39,7 +39,7 @@ will configure an appropriate backend automatically.}
 }
 \value{
 A \code{strainspy_fit} object with the following components:
-\item{row_data}{A DFrame with 6 slots with feature details}
+\item{row_data}{The \code{rowData} of \code{se} for the fitted features}
 \item{coefficients}{A DFrame with coefficients for each feature}
 \item{std_errors}{A DFrame of standard errors for each feature}
 \item{p_values}{A DFrame of p-values for each feature}
@@ -49,22 +49,24 @@ A \code{strainspy_fit} object with the following components:
 \item{call}{Call to \code{glmObFit}}
 }
 \description{
-TODO: Implement return of vcov info. Patched for compatibility (returns NULL)
-}
-\details{
-This function fits a ordinalbeta regression model using the \code{glmmTMB} package.
+This function fits an ordinal beta regression model using the \code{glmmTMB} package.
 It takes a \code{SummarizedExperiment} object as input, along with a user-defined formula,
 and fits an ordinal beta regression model on the assay data.
-
+}
+\details{
 For robust model fitting, it is recommended to use maximum a posteriori (MAP)
-estimation. Emprical Bayes MAP priors can be computed using \code{strainspy::compute_eb_priors()}.
+estimation. Empirical Bayes MAP priors can be computed using \code{strainspy::compute_eb_priors()}.
 They can also be manually defined using \code{strainspy::define_priors()}. The resulting
 \code{strainspy_priors} object can be passed to the \code{MAP_prior} argument.
 
 Alternatively, a character string (\code{"preset_weak"} or \code{"preset_strong"}) or a
 valid prior \code{data.frame} (see \code{?glmmTMB::priors}) can be provided instead.
 This will result in a call to \code{strainspy::define_priors()} to generate priors.
-To disable MAP estimation and perform standard REML fitting, set \code{MAP_prior = NULL}.
+To disable MAP estimation and fit by maximum likelihood without priors, set \code{MAP_prior = NULL}.
+
+Variance-covariance matrices are not returned by this fitter: the \code{vcov} slot
+of the result is \code{NULL}, so the fit cannot be used with
+\code{comp_ani_diff_and_posthoc_test()}.
 }
 \examples{
 library(strainspy)

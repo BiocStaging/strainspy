@@ -7,7 +7,7 @@
 plot_pca_biplot(se, phenotype, plot = TRUE)
 }
 \arguments{
-\item{se}{A \code{SummarizedExperiment} object containing expression data.}
+\item{se}{A \code{SummarizedExperiment} object containing ANI data.}
 
 \item{phenotype}{A character string specifying the name of a phenotype or an integer specifying the column number in colData(se)}
 

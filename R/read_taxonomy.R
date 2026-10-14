@@ -1,12 +1,15 @@
-#' Read and process a taxonomy file in Sylph format
+#' Read and process a taxonomy file
 #'
-#' This function reads a taxonomy file in Sylph format.
+#' This function reads a headerless, two-column, tab-separated taxonomy file: genome
+#' accession and GTDB-style lineage string (`d__...;p__...;...;s__...`), as distributed
+#' with the sylph GTDB databases.
 #'
 #' @importFrom data.table fread tstrsplit
 #' @importFrom dplyr arrange
 #' 
 #' @param file_path Path to the taxonomy file.
-#' @return A data.table containing parsed taxonomy information.
+#' @return A data.table with columns `Genome`, `Taxonomy`, `Domain`, `Phylum`, `Class`,
+#'   `Order`, `Family`, `Genus`, `Species` and `index` (the row order after sorting by lineage).
 #' @examples
 #' tax <- read_taxonomy(system.file("extdata", "example_taxonomy.tsv.gz", 
 #' package = "strainspy"))
@@ -29,5 +32,3 @@ read_taxonomy <- function(file_path) {
   return(tax)
 }
 
-# Example usage
-# taxonomy_data <- read_taxonomy("./inst/extdata/sylph_gtdb_rep_taxonomy.tsv.gz")

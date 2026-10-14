@@ -1,15 +1,18 @@
 #' Performs hierarchical taxonomy aware adjustment of p-values.
 #'
-#' This function performs multiple testing adjustment on the results of a betaGLM object
-#' integrating taxonomic information. Various correction methods are available,
-#' including Harmonic Mean P-value (HMP), Bonferroni and Benjamini-Hochberg (BH).
+#' This function performs multiple testing adjustment on the results of a `strainspy_fit`
+#' object at each taxonomic level, using either the Harmonic Mean P-value (HMP) or
+#' Bonferroni correction.
 #'
 #' @param object A `strainspy_fit` object.
 #' @param coef The coefficient to use for p-value adjustment. Defaults to 2.
-#' @param method The method for p-value adjustment. Options include "bonferroni" and Harmonic Mean P-value (HMP).
-#' @param taxonomy A taxonomy data.table object. If provided, the p-values will be adjusted at each taxonomic level.
-#' @param index_range This option is only used to generate Manhattan plot segments for higher taxonomic levels
-#' @return A tibble with original and adjusted p-values.
+#' @param method The method for p-value adjustment: "HMP" (default) or "bonferroni".
+#' @param taxonomy Required. A taxonomy table from `read_taxonomy()`, or the path to the taxonomy file.
+#' @param index_range Logical. Also return `index_min` and `index_max` columns, used to draw
+#'   Manhattan plot segments for higher taxonomic levels. Default `FALSE`.
+#' @return A tibble with one row per taxon and level, with columns `Level`, `Model`, `Name`,
+#'   the number of strains (`strain_count` for HMP, `sequence_count` for Bonferroni),
+#'   `mean_coefficient` and the adjusted p-value `p_adjust`.
 #' @examples
 #' meta <- read.csv(system.file("extdata", "example_metadata.csv.gz", 
 #' package = "strainspy"))
@@ -27,27 +30,32 @@
 #' @importFrom tibble add_column as_tibble
 #' @importFrom dplyr group_by left_join arrange mutate across all_of n rename summarise
 #' @importFrom purrr map_dfr
-#' @importFrom methods slot
 #' @importFrom stats setNames
 #'
 #' @export
-hadjust <- function(object, coef=2, method = "HMP", taxonomy=NULL, index_range=FALSE) {
+hadjust <- function(object, coef=2, method = "HMP", taxonomy, index_range=FALSE) {
   # Validate input
   if (!inherits(object, "strainspy_fit")) {
     stop("Input must be a strainspy_fit object.")
   }
   
-  # Check if taxonomy data is provided
+  # Taxonomy is required: a table from read_taxonomy() or a path to the file
   if (is.null(taxonomy)) {
-    stop("No taxonomy data provided.")
+    stop("`taxonomy` is required.")
   } else if (is.character(taxonomy)) {
     tax <- read_taxonomy(taxonomy)
   } else {
     tax <- taxonomy
   }
+
+  # Only two taxonomy-aware adjustments are implemented
+  if (!method %in% c("HMP", "bonferroni")) {
+    warning("method = '", method, "' is not available for taxonomy-aware adjustment; ",
+            "using 'bonferroni'. Supported methods are 'HMP' and 'bonferroni'.", call. = FALSE)
+  }
   
   # Extract p-values & coefficients
-  mdl = as.character(object@call)[[1]]
+  mdl <- as.character(getFitCall(object))[[1]]
   if ("caseControlFit" == mdl) {
     main_model <- "Logistic"
   } else if ("glmZiBFit" == mdl | "glmObFit" == mdl) {
@@ -56,43 +64,39 @@ hadjust <- function(object, coef=2, method = "HMP", taxonomy=NULL, index_range=F
     main_model <- "Unknown model" # We need to expand this as we include models
   }
   
-  beta_res <- tibble::as_tibble(slot(object, 'row_data')) |>
-    tibble::add_column(coefficient=slot(object, 'coefficients')[[coef]]) |>
-    tibble::add_column(std_error=slot(object, 'std_errors')[[coef]]) |>
-    tibble::add_column(p_value=slot(object, 'p_values')[[coef]]) |>
+  beta_res <- tibble::as_tibble(getRowData(object)) |>
+    tibble::add_column(coefficient=getCoefficients(object)[[coef]]) |>
+    tibble::add_column(std_error=getStdErrors(object)[[coef]]) |>
+    tibble::add_column(p_value=getPValues(object)[[coef]]) |>
     tibble::add_column(Model=main_model, .before=1)
   
-  if (!is.null(slot(object, 'zi_coefficients'))) {
-    zi_res  <- tibble::as_tibble(slot(object, 'row_data')) |>
-      tibble::add_column(coefficient=slot(object, 'zi_coefficients')[[coef]]) |>
-      tibble::add_column(std_error=slot(object, 'zi_std_errors')[[coef]]) |>
-      tibble::add_column(p_value=slot(object, 'zi_p_values')[[coef]]) |>
+  if (!is.null(getZICoefficients(object))) {
+    zi_res  <- tibble::as_tibble(getRowData(object)) |>
+      tibble::add_column(coefficient=getZICoefficients(object)[[coef]]) |>
+      tibble::add_column(std_error=getZIStdErrors(object)[[coef]]) |>
+      tibble::add_column(p_value=getZIPValues(object)[[coef]]) |>
       tibble::add_column(Model="Zero-Inflated", .before=1)
   }
   
   # Check which column in row_data is corresponds to the taxonomic data
-  tax_col <- NULL
-  for (i in seq_len(ncol(slot(object, 'row_data')))) {
-    if (all(slot(object, 'row_data')[,i] %in% tax$Genome)) {
-      tax_col <- i
-      break
-    }
-  }
-  if (is.null(tax_col)) {
-    stop("Taxon names do not match any column found in row data.
-         Taxonomy will be ignored and p-values will only be adjusted at the strain/sequence level.")
+  row_data <- getRowData(object)
+  tax_col <- Position(function(i) all(row_data[, i] %in% tax$Genome),
+                      seq_len(ncol(row_data)))
+  if (is.na(tax_col)) {
+    stop("Taxon names in `taxonomy` do not match any column of rowData(object); ",
+         "cannot adjust p-values by taxonomy.")
   }
   
   hierarchy_df <- beta_res |>
-    dplyr::left_join(tax, by = setNames("Genome", names(slot(object, 'row_data'))[tax_col])) |>
+    dplyr::left_join(tax, by = setNames("Genome", names(getRowData(object))[tax_col])) |>
     dplyr::arrange(Domain, Phylum, Class, Order, Family, Genus, Species, index) |>
     dplyr::mutate(index=seq_len(nrow(beta_res)))
   
-  if (!is.null(slot(object, 'zi_coefficients'))){
+  if (!is.null(getZICoefficients(object))){
     hierarchy_df <- rbind(
       hierarchy_df,
       zi_res |>
-        dplyr::left_join(tax, by = setNames("Genome", names(slot(object, 'row_data'))[tax_col]))  |>
+        dplyr::left_join(tax, by = setNames("Genome", names(getRowData(object))[tax_col]))  |>
         dplyr::arrange(Domain, Phylum, Class, Order, Family, Genus, Species, index) |>
         dplyr::mutate(index=seq_len(nrow(zi_res)))
     )
@@ -125,7 +129,7 @@ hadjust <- function(object, coef=2, method = "HMP", taxonomy=NULL, index_range=F
         dplyr::summarise(
           strain_count = dplyr::n(),
           mean_coefficient = mean(coefficient),
-          p_adjust = harmonicmeanp::p.hmp(p_value, w, L, multilevel = TRUE) / sum(w),
+          p_adjust = p.hmp(p_value, w, L, multilevel = TRUE) / sum(w),
           index_min = min(index),
           index_max = max(index),
           .groups = "drop"  # Drop the grouping after summarizing

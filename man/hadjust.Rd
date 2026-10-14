@@ -4,26 +4,29 @@
 \alias{hadjust}
 \title{Performs hierarchical taxonomy aware adjustment of p-values.}
 \usage{
-hadjust(object, coef = 2, method = "HMP", taxonomy = NULL, index_range = FALSE)
+hadjust(object, coef = 2, method = "HMP", taxonomy, index_range = FALSE)
 }
 \arguments{
 \item{object}{A \code{strainspy_fit} object.}
 
 \item{coef}{The coefficient to use for p-value adjustment. Defaults to 2.}
 
-\item{method}{The method for p-value adjustment. Options include "bonferroni" and Harmonic Mean P-value (HMP).}
+\item{method}{The method for p-value adjustment: "HMP" (default) or "bonferroni".}
 
-\item{taxonomy}{A taxonomy data.table object. If provided, the p-values will be adjusted at each taxonomic level.}
+\item{taxonomy}{Required. A taxonomy table from \code{read_taxonomy()}, or the path to the taxonomy file.}
 
-\item{index_range}{This option is only used to generate Manhattan plot segments for higher taxonomic levels}
+\item{index_range}{Logical. Also return \code{index_min} and \code{index_max} columns, used to draw
+Manhattan plot segments for higher taxonomic levels. Default \code{FALSE}.}
 }
 \value{
-A tibble with original and adjusted p-values.
+A tibble with one row per taxon and level, with columns \code{Level}, \code{Model}, \code{Name},
+the number of strains (\code{strain_count} for HMP, \code{sequence_count} for Bonferroni),
+\code{mean_coefficient} and the adjusted p-value \code{p_adjust}.
 }
 \description{
-This function performs multiple testing adjustment on the results of a betaGLM object
-integrating taxonomic information. Various correction methods are available,
-including Harmonic Mean P-value (HMP), Bonferroni and Benjamini-Hochberg (BH).
+This function performs multiple testing adjustment on the results of a \code{strainspy_fit}
+object at each taxonomic level, using either the Harmonic Mean P-value (HMP) or
+Bonferroni correction.
 }
 \examples{
 meta <- read.csv(system.file("extdata", "example_metadata.csv.gz", 

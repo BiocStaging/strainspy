@@ -1,11 +1,12 @@
 #' read_sourmash
 #' 
-#' This function reads a `sourmash gather` or `sourmash search` -like output CSV file and create a SummarizedExperiment object. 
+#' This function reads a `sourmash gather` or `sourmash search` -like output CSV file and creates a SummarizedExperiment object. 
 #' An optional metadata table can be provided and added directly to `colData` via an internal call to `modify_metadata()`.
 #'
-#' @note Some of sourmash subcommands like `gather` are designed to take exactly one query file. 
-#' To merge and save a CSV file suitable to use with this function, use `merge_sourmash_files()`
-#' #' If metadata is provided, it must meet the input requirements described in 
+#' @note Some sourmash subcommands, like `gather`, are designed to take exactly one query file. 
+#' To merge and save a CSV file suitable to use with this function, use `merge_sourmash_files()`.
+#'
+#' If metadata is provided, it must meet the input requirements described in 
 #' `modify_metadata()`. If appending metadata fails due to pre processing requirements, 
 #' this function will issue a detailed warning and still return the `SummarizedExperiment` 
 #' object without metadata. In that case, apply necessary fixes and subsequently 
@@ -18,7 +19,7 @@
 #' leaving only the base file name. Defaults to `TRUE`.
 #'
 #' @return A SummarizedExperiment object with the following components:
-#'   \item{assays}{A matrix containing numeric features such as `Adjusted_ANI`, `Taxonomic_abundance`, `Median_cov`, etc.}
+#'   \item{assays}{A matrix of the selected `variable`, by default `match_containment_ani`.}
 #'   \item{rowData}{DataFrame containing metadata for each sequence, such as `Contig_name` and `Genome_file`.}
 #'   \item{colData}{DataFrame containing information for each sample (derived from the `Sample_file` field).}
 #'
@@ -57,18 +58,18 @@ read_sourmash <- function(file_path, meta_data=NULL, variable="match_containment
   # both name = genome_name and contig will be present
   
   if("contig" %in% preview_col_names) {
-    required_columns = c("query_name", "name", "contig", variable)
-    genome_and_contig = TRUE
+    required_columns <- c("query_name", "name", "contig", variable)
+    genome_and_contig <- TRUE
   } else {
     required_columns <- c("query_name", "name", variable)
-    genome_and_contig = FALSE
+    genome_and_contig <- FALSE
   }
   
   # Validate that the data contains the expected columns
   missing_columns <- setdiff(required_columns, preview_col_names)
   if (length(missing_columns) > 0) {
-    stop(paste0("The following required columns are missing from the Sourmash file: ",
-                paste(missing_columns, collapse = ", ")))
+    missing_txt <- paste(missing_columns, collapse = ", ")
+    stop("The following required columns are missing from the Sourmash file: ", missing_txt)
   }
   
   
@@ -81,12 +82,12 @@ read_sourmash <- function(file_path, meta_data=NULL, variable="match_containment
   )
   
   if(genome_and_contig){
-    colnames(sourmash_data)[1] = "Sample_file" # we'll rename this to match with sylph
-    colnames(sourmash_data)[2] = "Genome_file" # we'll rename this to match with sylph
-    colnames(sourmash_data)[3] = "Contig_name" # we'll rename this to match with sylph
+    colnames(sourmash_data)[1] <- "Sample_file" # we'll rename this to match with sylph
+    colnames(sourmash_data)[2] <- "Genome_file" # we'll rename this to match with sylph
+    colnames(sourmash_data)[3] <- "Contig_name" # we'll rename this to match with sylph
   } else {
-    colnames(sourmash_data)[1] = "Sample_file" # we'll rename this to match with sylph
-    colnames(sourmash_data)[2] = "Contig_name" # we'll rename this to match with sylph
+    colnames(sourmash_data)[1] <- "Sample_file" # we'll rename this to match with sylph
+    colnames(sourmash_data)[2] <- "Contig_name" # we'll rename this to match with sylph
   }
   
   # Calculate row indices using
@@ -99,36 +100,10 @@ read_sourmash <- function(file_path, meta_data=NULL, variable="match_containment
   n_rows <- max(sourmash_data$row_indices)
   n_cols <- max(sourmash_data$col_indices)
   
-  # Merge metadata if provided
-  # if (is.null(meta_data)){
   # Generate colData
   col_data <- S4Vectors::DataFrame(unique(sourmash_data[, .(Sample_file, col_indices)][order(col_indices)]))
   rownames(col_data) <- col_data[,1]
   col_data[['col_indices']] <- NULL
-  # } else {
-  #   col_data <- unique(sourmash_data[, .(Sample_file, col_indices)][order(col_indices)])
-  # 
-  #   # Extract unique sample names
-  #   meta_samples <- unique(meta_data[[1]])
-  # 
-  #   # Warn about mismatched samples
-  #   if (length(missing_from_meta <- setdiff(col_data$Sample_file, meta_samples)) > 0) {
-  #     stop("The following samples from 'sourmash_data' are not in 'meta_data': ", paste(missing_from_meta, collapse = ", "))
-  #   }
-  # 
-  #   if (length(missing_from_sourmash <- setdiff(meta_samples, col_data$Sample_file)) > 0) {
-  #     stop("The following samples from 'meta_data' are not in 'sourmash_data': ", paste(missing_from_sourmash, collapse = ", "))
-  #   }
-  # 
-  #   col_data <- S4Vectors::DataFrame(base::merge(col_data, meta_data,
-  #                              by.x = "Sample_file",
-  #                              by.y = names(meta_data)[1],
-  #                              all.x = TRUE)) # Keeps all Sample_file entries from sourmash_data
-  # 
-  # 
-  #   rownames(col_data) <- col_data[["Sample_file"]]
-  #   col_data[['col_indices']] <- NULL
-  # }
   
   # Extract row metadata (rowData)
   # Generate row_data using unique combinations and indices
@@ -148,14 +123,14 @@ read_sourmash <- function(file_path, meta_data=NULL, variable="match_containment
   # Deal with file names and extensions
   if (clean_names){
     if(genome_and_contig){
-      row_data$Genome_file <- tools::file_path_sans_ext(basename(row_data$Genome_file),
+      row_data$Genome_file <- file_path_sans_ext(basename(row_data$Genome_file),
                                                         compression = TRUE)
       row_data$Genome_file <- gsub("^.*(GC[A-Z]_\\d+\\.\\d+).*", "\\1", row_data$Genome_file)
     }
     
-    col_data$Sample_file <- tools::file_path_sans_ext(basename(col_data$Sample_file),
+    col_data$Sample_file <- file_path_sans_ext(basename(col_data$Sample_file),
                                                       compression = TRUE)
-    rownames(col_data) <- tools::file_path_sans_ext(basename(rownames(col_data)),
+    rownames(col_data) <- file_path_sans_ext(basename(rownames(col_data)),
                                                     compression = TRUE)
   }
   
@@ -163,7 +138,7 @@ read_sourmash <- function(file_path, meta_data=NULL, variable="match_containment
   check_unique_names(rownames(col_data), "sample", clean_names)
   check_unique_names(rownames(row_data), "feature", clean_names)
 
-  se = SummarizedExperiment::SummarizedExperiment(
+  se <- SummarizedExperiment::SummarizedExperiment(
     assays = list(Matrix::sparseMatrix(
       i = sourmash_data[['row_indices']],
       j = sourmash_data[['col_indices']],
@@ -200,7 +175,7 @@ read_sourmash <- function(file_path, meta_data=NULL, variable="match_containment
 #' 
 #' 
 #' @param sourmash_files A character vector of file paths to merge.
-#' @param manifest_file If one or several indexed databases were used for searching or gathering, required genome column can be missing.
+#' @param manifest_file If one or several indexed databases were used for searching or gathering, the required genome column can be missing.
 #' The path to the output of `sourmash sig manifest` can be provided to try and add back the data automatically (Default = NULL). 
 #' If provided, columns `md5`, `name` and `filename` are required.  This function uses `name` and `md5` to match the manifest data with sourmash outputs. 
 #' In the final output, `filename` will be used to identify each hit. If the `filename` is a path, the basename without extensions will be used instead.
@@ -231,59 +206,62 @@ merge_sourmash_files <- function(sourmash_files, manifest_file = NULL, output, s
   }
   
   header <- data.table::fread(sourmash_files[1], nrows = 1, header = TRUE)
-  header = colnames(header)
+  header <- colnames(header)
   
   data_list <- lapply(sourmash_files, function(file) fread(file, skip = 1, quote = "\"" ))
   merged_data <- data.table::rbindlist(data_list, use.names = TRUE, fill = TRUE)
   
   # if filename is in header, let's name it filename_db
-  if("filename" %in% header) header[header == "filename"] = "filename_db"
+  if("filename" %in% header) header[header == "filename"] <- "filename_db"
   
-  colnames(merged_data) = header
+  colnames(merged_data) <- header
   
   if(!is.null(manifest_file)){ # we only want the genome name for taxonomic stuff...
-    manifest = data.table::fread(manifest_file)
+    manifest <- data.table::fread(manifest_file)
     required_columns <- c("md5", "name", "filename")
     missing_columns <- setdiff(required_columns, colnames(manifest))
     if(length(missing_columns) == 0){
-      manifest = data.table(md5 = manifest$md5, name = manifest$name, filename = manifest$filename)
+      manifest <- data.table(md5 = manifest$md5, name = manifest$name, filename = manifest$filename)
     } else {
       stop("Manifest file doesn't contain all required columns")
     }
     # content in md5 and name must match with md5 and name in merged_data
     if(manifest$md5[1] %in% merged_data$md5 & manifest$name[1] %in% merged_data$name) {
-      merged_data = merge.data.table(merged_data, manifest, by =  c("md5", "name"))
+      merged_data <- merge.data.table(merged_data, manifest, by =  c("md5", "name"))
     }
     
     # change filename to name and name to contig
-    colnames(merged_data)[which("name" == colnames(merged_data))] = "contig"
-    colnames(merged_data)[which("filename" == colnames(merged_data))] = "name"
+    colnames(merged_data)[which("name" == colnames(merged_data))] <- "contig"
+    colnames(merged_data)[which("filename" == colnames(merged_data))] <- "name"
     
-    merged_data$name = unname(sapply(basename(merged_data$name),  function(x) sub("\\.[^.]+$", "", sub("\\.[^.]+$", "", x))))
+    merged_data$name <- unname(vapply(basename(merged_data$name),  function(x) sub("\\.[^.]+$", "", sub("\\.[^.]+$", "", x)), character(1)))
     
   }
   
   if(strip_unusable) {
-    drp = c()
+    drp <- c()
     # md5s 
-    drp_tmp = grep("md5", colnames(merged_data))
+    drp_tmp <- grep("md5", colnames(merged_data))
     if(length(drp_tmp) > 0) {
-      message("Stripping ", length(drp_tmp), " md5 columns: ", paste(colnames(merged_data)[drp_tmp], collapse = ', '))
-      drp = c(drp_tmp)
+      drp_txt <- paste(colnames(merged_data)[drp_tmp], collapse = ', ')
+      message("Stripping ", length(drp_tmp), " md5 columns: ", drp_txt)
+      drp <- c(drp_tmp)
     }
     
     # NAs
-    drp_tmp <- which(sapply(merged_data, function(x) all(is.na(x))))
+    drp_tmp <- which(vapply(merged_data, function(x) all(is.na(x)), logical(1)))
     if(length(drp_tmp) > 0) {
-      message("Stripping ", length(drp_tmp), " all NA columns: ", paste(colnames(merged_data)[drp_tmp], collapse = ', '))
-      drp = c(drp, drp_tmp)
+      drp_txt <- paste(colnames(merged_data)[drp_tmp], collapse = ', ')
+      message("Stripping ", length(drp_tmp), " all NA columns: ", drp_txt)
+      drp <- c(drp, drp_tmp)
     }
     
     # Invariant columns
-    drp_tmp <- which(sapply(merged_data, function(x) length(na.omit(unique(x))) == 1))
+    drp_tmp <- which(vapply(merged_data, function(x) length(na.omit(unique(x))) == 1, logical(1)))
     if(length(drp_tmp) > 0) {
-      message("Stripping ", length(drp_tmp), " invariant columns: ", paste(colnames(merged_data)[drp_tmp], collapse = ', '))
-      drp = c(drp, drp_tmp)
+      drp_txt <- paste(colnames(merged_data)[drp_tmp], collapse = ', ')
+      message("Stripping ", length(drp_tmp), " invariant columns: ", drp_txt)
+      drp <- c(drp, drp_tmp)
     }
     
     set(merged_data, j = colnames(merged_data)[unique(drp)], value = NULL)

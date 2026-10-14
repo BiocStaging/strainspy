@@ -24,7 +24,7 @@ Updated SummarizedExperiment object.
 This function adds or modifies metadata in a \code{SummarizedExperiment} object.
 }
 \details{
-If \code{convert = TRUE}, character columns with less than 5 unique (non-NA) values will be automatically
+If \code{convert = TRUE}, character columns with 5 or fewer unique (non-NA) values will be automatically
 converted to factors, with levels ordered alphabetically. For meaningful association testing,
 however, factor levels should reflect the intended reference level. It is recommended to
 manually convert such variables to factors with explicitly set levels \emph{before} calling \code{modify_metadata()}.

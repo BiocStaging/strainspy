@@ -22,9 +22,9 @@ caseControlFit(
 \item{min_identity}{A numeric value specifying the minimum identity threshold to consider (default=0.98).}
 
 \item{nthreads}{An integer specifying the number of (CPUs or workers) to use. Defaults
-to one 1.}
+to 1.}
 
-\item{scale_continuous}{Logical. If \code{TRUE}, all numeric columns in \code{colData(se)} are z-score standardized (mean = 0, SD = 1). Defaults to \code{FALSE}.}
+\item{scale_continuous}{Logical. If \code{TRUE}, all numeric columns in \code{colData(se)} are z-score standardized (mean = 0, SD = 1). Defaults to \code{TRUE}.}
 
 \item{BPPARAM}{Optional \code{BiocParallelParam} object. If not provided, the function
 will configure an appropriate backend automatically.}
@@ -33,11 +33,11 @@ will configure an appropriate backend automatically.}
 }
 \value{
 A \code{strainspy_fit} object with the following components:
-\item{row_data}{A DFrame with 6 slots with feature details}
+\item{row_data}{The \code{rowData} of \code{se} for the fitted features}
 \item{coefficients}{A DFrame with coefficients for each feature}
 \item{std_errors}{A DFrame of standard errors for each feature}
 \item{p_values}{A DFrame of p-values for each feature}
-\item{residuals}{A DFrame of residual vectors for each feature}
+\item{residuals}{\code{NULL}; residuals are not stored by this fitter}
 \item{convergence}{A named logical vector indicating convergence for each feature}
 \item{design}{Formula used in the call to \code{caseControlFit}}
 \item{call}{Call to \code{caseControlFit}}

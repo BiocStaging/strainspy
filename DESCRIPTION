@@ -1,12 +1,12 @@
 Package: strainspy
 Type: Package
 Title: Strain Level Microbiome Wide Association Studies
-Version: 0.99.2
+Version: 0.99.3
 Depends: R (>= 4.1.0)
 Authors@R: c(
     person(given = "Gerry", family = "Tonkin-Hill",
         role = "aut", email = "g.tonkinhill@gmail.com"),
-    person(given = "Sudaraka", family = "Mallawarachchi",
+    person(given = "Sudaraka", family = "Mallawaarachchi",
         role = c("aut", "cre"), email = "smallawaarachchi@gmail.com",
         comment = c(ORCID = "0000-0001-8899-3323"))
     )

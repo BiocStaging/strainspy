@@ -23,7 +23,7 @@ estimate_beta_diversity(
 
 \item{ani_threshold}{Numeric. Threshold for presence/absence determination if \code{method == jaccard} (default 95)}
 
-\item{phenotype}{Any factor variable in \code{colnames(se@colData)}. Not required if \code{distance_only == FALSE}}
+\item{phenotype}{Any factor variable in \code{colnames(colData(se))}. Required unless \code{distance_only = TRUE}}
 
 \item{show_plots}{Logical. If TRUE, shows the plots (default = FALSE)}
 
@@ -41,7 +41,9 @@ If distance_only = TRUE, returns distance object. Otherwise a list with:
 }
 }
 \description{
-Estimate beta diversity from ANI
+Computes between-sample distances from the ANI matrix and, unless \code{distance_only = TRUE},
+runs NMDS, PERMANOVA and a beta-dispersion test grouped by \code{phenotype}. The \code{vegan}
+package is required for \code{method = "jaccard"} and for everything beyond the distance matrix.
 }
 \examples{
 meta <- read.csv(system.file("extdata", "example_metadata.csv.gz", 

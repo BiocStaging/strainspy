@@ -6,6 +6,7 @@
 #' @param term Formula object
 #' 
 #' @return A formula without mixed components
+#' @noRd
 nobars_ <- function(term)
 {
   if (!anyBars(term)) return(term)
@@ -24,6 +25,97 @@ nobars_ <- function(term)
   term[[2]] <- nb2
   term[[3]] <- nb3
   term
+}
+
+#' Validate a design formula
+#'
+#' Checks that `design` is a formula and that `nobars_()` can strip any random
+#' effect terms from it. Shared by the fitter functions.
+#'
+#' @param design Formula object
+#'
+#' @return The fixed-effects-only formula returned by `nobars_()`
+#' @noRd
+check_design_formula <- function(design) {
+  if (!inherits(design, "formula")) {
+    stop("`design` must be a formula (e.g., ~ batch + condition).")
+  }
+  nbd <- nobars_(design)
+  if (is.null(nbd)) {
+    design_txt <- paste(design, collapse = "")
+    stop(design_txt, " --- is not a valid formula.")
+  }
+  nbd
+}
+
+#' Choose the BiocParallel backend for a chunked fit
+#'
+#' Shared by every fitter. With more than one thread on a non-Windows platform
+#' a `SnowParam` is created unless the caller supplied `BPPARAM`, in which case
+#' only its progress bar is switched off when `progress = FALSE`. Otherwise a
+#' `SerialParam` is used.
+#'
+#' @param nthreads Integer. Number of workers requested.
+#' @param BPPARAM A `BiocParallelParam` object supplied by the caller, or `NULL`.
+#' @param progress Logical. Whether to show a progress bar.
+#' @param tasks Integer. Passed to `BiocParallel::SnowParam()` when a backend is created.
+#'
+#' @return A `BiocParallelParam` object.
+#' @noRd
+setup_bpparam <- function(nthreads, BPPARAM, progress, tasks = 0L) {
+  if ((nthreads > 1) & (.Platform$OS.type != "windows")) {
+    if (is.null(BPPARAM)) {
+      BPPARAM <- BiocParallel::SnowParam(workers = nthreads, progressbar = progress, tasks = tasks)
+    } else if (!progress) {
+      BiocParallel::bpprogressbar(BPPARAM) <- FALSE
+    }
+  } else {
+    BPPARAM <- BiocParallel::SerialParam(progressbar = progress)
+  }
+  BPPARAM
+}
+
+#' Z-score the numeric columns of a sample table
+#'
+#' Column-by-column so that it works on both a `data.frame` and a `DataFrame`.
+#' By default each scaled column keeps the one-column matrix returned by
+#' `scale()`; `as_vector = TRUE` drops it to a plain numeric vector.
+#'
+#' @param x A `data.frame` or `DataFrame`.
+#' @param as_vector Logical. Convert each scaled column to a numeric vector.
+#'
+#' @return `x` with its numeric columns scaled.
+#' @noRd
+scale_numeric_columns <- function(x, as_vector = FALSE) {
+  for (col in names(x)) {
+    if (is.numeric(x[[col]])) {
+      scaled <- scale(x[[col]])
+      x[[col]] <- if (as_vector) as.numeric(scaled) else scaled
+    }
+  }
+  x
+}
+
+#' Stop with an installation hint if suggested packages are missing
+#'
+#' Used wherever an optional feature depends on packages listed in Suggests.
+#'
+#' @param pkgs Character vector of package names.
+#' @param purpose Short description of the feature that needs them, used in
+#'   the error message.
+#'
+#' @return `TRUE`, invisibly, when every package is available.
+#' @noRd
+require_suggested <- function(pkgs, purpose) {
+  missing <- pkgs[!vapply(pkgs, requireNamespace, logical(1), quietly = TRUE)]
+  if (length(missing) > 0) {
+    missing_txt <- paste(missing, collapse = ", ")
+    quoted_txt <- paste0('"', missing, '"', collapse = ", ")
+    stop("Package(s) ", missing_txt, " are required for ", purpose,
+         " but are not installed.\nTry: BiocManager::install(c(", quoted_txt, "))",
+         call. = FALSE)
+  }
+  invisible(TRUE)
 }
 
 isBar <- function(term) {
@@ -53,7 +145,8 @@ anyBars <- function(term) {
 #' @param max_length Numeric. Number of characters to keep (default 50)
 #' @param return_map bool. Return data.frame of original and shortened contig names for mapping
 #' 
-#' @return A data.frame or original and shortened names, or a vector of shortened name in the same order
+#' @return A data.frame of original and shortened names, or a vector of shortened name in the same order
+#' @noRd
 clean_contig_names <- function(contig_names, max_length = 50, return_map = FALSE) {
   clean_one <- function(name, max_length) {
     if (nchar(name) <= max_length) return(name)  # Skip cleaning if already short
@@ -77,7 +170,7 @@ clean_contig_names <- function(contig_names, max_length = 50, return_map = FALSE
     substr(name, 1, max_length)
   }
   
-  cleaned <- unname(sapply(contig_names, function(x) clean_one(x, max_length)))
+  cleaned <- unname(vapply(contig_names, function(x) clean_one(x, max_length), character(1)))
   cleaned <- ifelse(nchar(cleaned) > max_length, substr(cleaned, 1, max_length), cleaned)
   cleaned_unique <- make.unique(cleaned, sep = "_")
   
@@ -100,6 +193,7 @@ clean_contig_names <- function(contig_names, max_length = 50, return_map = FALSE
 #' @param n Integer. The number of colours needed.
 #'
 #' @return A character vector of \code{n} colour hex codes.
+#' @noRd
 get_colors <- function(n) {
   base_colors <- c(
     '#a6cee3','#1f78b4','#b2df8a','#33a02c','#fb9a99','#e31a1c','#fdbf6f','#ff7f00',
@@ -124,7 +218,8 @@ get_colors <- function(n) {
 #' @param eps offset value (default 1e-2)
 #'
 #' @return Adjusted ANI vector
-offset_ANI = function(x, eps = 1e-2){
+#' @noRd
+offset_ANI <- function(x, eps = 1e-2){
   x[x>0] <- x[x>0] - eps
   x
 }
@@ -140,6 +235,7 @@ offset_ANI = function(x, eps = 1e-2){
 #' @param design A fixed-effects-only formula.
 #'
 #' @return A `strainspy_priors` object or NULL.
+#' @noRd
 resolve_priors <- function(MAP_prior, se, design) {
   if (is.null(MAP_prior)) {
     return(NULL)  # unpenalised ML fit
@@ -171,13 +267,14 @@ resolve_priors <- function(MAP_prior, se, design) {
   # NULL here would silently drop the priors and fit by maximum likelihood, so a
   # typo or a factor/list slipping through would quietly change the model. Only
   # an explicit MAP_prior = NULL selects the unpenalised fit.
+  class_txt <- paste(sQuote(class(MAP_prior)), collapse = "/")
   stop("`MAP_prior` must be NULL (for an unpenalised maximum-likelihood fit), ",
        "one of 'preset_weak' / 'preset_strong', a prior `data.frame`, or a ",
        "`strainspy_priors` object; got an object of class ",
-       paste(sQuote(class(MAP_prior)), collapse = "/"), ".", call. = FALSE)
+       class_txt, ".", call. = FALSE)
 }
 
-build_tax_tree = function(tax_mhp){
+build_tax_tree <- function(tax_mhp){
   tax_levels_ <- c("Domain", "Phylum", "Class", "Order", "Family", "Genus", "Species", "Genome")
   tax_levels_ <- intersect(tax_levels_, colnames(tax_mhp))
   
@@ -187,9 +284,9 @@ build_tax_tree = function(tax_mhp){
   # strain is called genome here
   if(! ("Genome" %in% tax_levels) ){
     if("Strain" %in% tax_levels){
-      tax_levels[which(tax_levels == "Strain")] = "Genome"
+      tax_levels[which(tax_levels == "Strain")] <- "Genome"
     } else {
-      tax_levels = c(tax_levels, "Genome")
+      tax_levels <- c(tax_levels, "Genome")
     }
   }
   
@@ -200,15 +297,15 @@ build_tax_tree = function(tax_mhp){
   return(list(tree = tree, tax_mhp = tax_mhp))
 }
 
-colour_by_tax = function(genomes, taxonomy, tax_levels = NULL){
+colour_by_tax <- function(genomes, taxonomy, tax_levels = NULL){
   # This function generates a global taxonomic color palette 
   # If provided, we assume tax_levels is ordered
   tax_mhp <- taxonomy[match(genomes, taxonomy$Genome), ]
   
   # build tree for tax_mhp and update
-  btt = build_tax_tree(tax_mhp)
-  tree = btt$tree
-  tax_mhp = btt$tax_mhp
+  btt <- build_tax_tree(tax_mhp)
+  tree <- btt$tree
+  tax_mhp <- btt$tax_mhp
   
   # Pre-plot to extract tip order
   p_tmp <- ggtree::ggtree(tree)
@@ -252,10 +349,8 @@ add_tax2tophits <- function(top_hits, taxonomy, columns = c("Species")) {
   # check requested columns exist in taxonomy
   missing_cols <- setdiff(columns, names(taxonomy))
   if (length(missing_cols) > 0) {
-    stop(sprintf(
-      "Column(s) %s not found in 'taxonomy'.",
-      paste(missing_cols, collapse = ", ")
-    ))
+    missing_txt <- paste(missing_cols, collapse = ", ")
+    stop(sprintf("Column(s) %s not found in 'taxonomy'.", missing_txt))
   }
   
   # for each requested column, map values
@@ -265,9 +360,10 @@ add_tax2tophits <- function(top_hits, taxonomy, columns = c("Species")) {
     # warn if any unmatched
     if (any(is.na(mapped))) {
       bad <- unique(top_hits$Genome_file[is.na(mapped)])
+      bad_txt <- paste(utils::head(bad, 5), collapse = ", ")
       warning(sprintf(
         "Column '%s': unmatched genome(s) %d (examples: %s)",
-        col, length(bad), paste(utils::head(bad, 5), collapse = ", ")
+        col, length(bad), bad_txt
       ), call. = FALSE)
     }
     
@@ -302,6 +398,7 @@ add_tax2tophits <- function(top_hits, taxonomy, columns = c("Species")) {
 #'
 #' @return An increasing integer vector of positions in `results` that should be
 #'   dropped, or `integer(0)` if every fit succeeded.
+#' @noRd
 failed_fit_index <- function(results) {
   n <- length(results)
   if (n == 0L) return(integer(0))
@@ -344,6 +441,7 @@ failed_fit_index <- function(results) {
 #'   only to tailor the suggested remedy.
 #'
 #' @return `x`, invisibly, if every name is unique.
+#' @noRd
 check_unique_names <- function(x, what, clean_names = FALSE) {
   dup <- unique(x[duplicated(x)])
   if (length(dup) > 0L) {
@@ -354,9 +452,9 @@ check_unique_names <- function(x, what, clean_names = FALSE) {
     } else {
       "\nRename the inputs so that each name appears only once."
     }
-    stop("Duplicated ", what, " name(s) found: ",
-         paste(utils::head(dup, 10), collapse = ", "),
-         if (length(dup) > 10L) paste0(" (and ", length(dup) - 10L, " more)") else "",
+    dup_txt <- paste(utils::head(dup, 10), collapse = ", ")
+    more_txt <- if (length(dup) > 10L) paste0(" (and ", length(dup) - 10L, " more)") else ""
+    stop("Duplicated ", what, " name(s) found: ", dup_txt, more_txt,
          ".", hint, call. = FALSE)
   }
   invisible(x)
@@ -370,6 +468,7 @@ check_unique_names <- function(x, what, clean_names = FALSE) {
 #' @param progress The value supplied to a `progress` argument.
 #'
 #' @return `progress`, invisibly.
+#' @noRd
 check_progress <- function(progress) {
   if (!is.logical(progress) || length(progress) != 1L || is.na(progress)) {
     stop("`progress` must be a single logical value (TRUE or FALSE).", call. = FALSE)

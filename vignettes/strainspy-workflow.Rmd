@@ -26,7 +26,24 @@ You will walk through the core path most users care about:
 
 All examples use bundled data so the workflow runs end-to-end.
 
+## Installation
+
+Install the release version from Bioconductor:
+
+```{r install, eval=FALSE}
+if (!requireNamespace("BiocManager", quietly = TRUE)) {
+    install.packages("BiocManager")
+}
+BiocManager::install("strainspy")
+```
+
+Conda, container and GitHub installation options are described in the
+[package README](https://github.com/gtonkinhill/strainspy).
+
 ## Load package and example data
+
+The bundled files are described in `inst/extdata/README.md`
+(`system.file("extdata", "README.md", package = "strainspy")`).
 
 ```{r setup, message=FALSE, warning=FALSE}
 library(strainspy)
@@ -79,7 +96,7 @@ fit
 ## Find top hits
 
 `top_hits()` is usually the first table you inspect after fitting.
-It highlights contigs with strongest phenotype association and provides adjusted p-values.
+It highlights contigs with the strongest phenotype association and provides adjusted p-values.
 
 ```{r top-hits, message=FALSE, warning=FALSE}
 hits <- top_hits(fit, coef = 2, alpha = 1)
@@ -98,8 +115,7 @@ head(hier_hits[, c("Level", "Model", "Name", "p_adjust")])
 ## Generate plot-ready outputs
 
 The README demonstrates visualization early because it helps with interpretation.
-To keep this vignette stable in automated builds, we return data frames (`plot = FALSE`) rather than rendering all figures.
-You can set `plot = TRUE` interactively.
+The two main plots are rendered below. Set `plot = FALSE` in either call to get the underlying table instead of the figure.
 
 ```{r plot-data, message=FALSE, warning=FALSE}
 plot_volcano(fit, coef = 2)
@@ -151,7 +167,7 @@ class(mp)
 
 After this walkthrough, common next analyses are:
 
-1. Re-fit on the full filtered dataset (`se`) and tighten `alpha` in `top_hits()`.
+1. Tighten `alpha` in `top_hits()` to focus on the strongest hits.
 2. Use taxonomy-informed Manhattan summaries to prioritize clades.
 3. Export `prep_for_prediction()` outputs to train external classifiers.
 

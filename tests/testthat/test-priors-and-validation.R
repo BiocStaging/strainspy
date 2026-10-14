@@ -12,7 +12,7 @@ testthat::test_that("define_priors supports preset and manual validation", {
   )
 
   testthat::expect_s4_class(pri, "strainspy_priors")
-  testthat::expect_true(nrow(pri@priors_df) > 0)
+  testthat::expect_true(nrow(getPriorsDf(pri)) > 0)
 
   manual_df <- data.frame(
     prior = c("normal(0,2)", "normal(0,2)"),
@@ -131,4 +131,14 @@ testthat::test_that("resolve_priors validates character input", {
   testthat::expect_error(
     resolve_priors("not_a_preset", NULL, NULL), "must be one of"
   )
+})
+
+testthat::test_that("define_priors can add a dispersion prior", {
+  d <- ss_test_data()
+  pri <- suppressWarnings(
+    strainspy::define_priors(d$se_filtered[1:10, ], ~ Case_status, add_dispersion_prior = TRUE)
+  )
+  df <- strainspy::getPriorsDf(pri)
+  testthat::expect_true("fixef_disp" %in% df$class)
+  testthat::expect_equal(df$prior[df$class == "fixef_disp"], "normal(0,1)")
 })

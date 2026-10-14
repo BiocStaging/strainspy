@@ -5,7 +5,7 @@
 #' This function performs Principal Component Analysis (PCA) on a SummarizedExperiment object
 #' and generates a PCA biplot colored by a specified phenotype.
 #'
-#' @param se A `SummarizedExperiment` object containing expression data.
+#' @param se A `SummarizedExperiment` object containing ANI data.
 #' @param phenotype A character string specifying the name of a phenotype or an integer specifying the column number in colData(se)
 #' @param plot A logical value indicating whether to return the PCA plot (`TRUE`) or PCA data (`FALSE`). Default is `TRUE`.
 #'
@@ -23,7 +23,7 @@
 #' @export
 plot_pca_biplot <- function(se, phenotype, plot = TRUE) {
 
-  pheno_df = SummarizedExperiment::colData(se)
+  pheno_df <- SummarizedExperiment::colData(se)
   
   if (is.numeric(phenotype)) {
     if(phenotype == 1){

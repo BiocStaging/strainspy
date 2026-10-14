@@ -18,7 +18,7 @@
 #' @param model_method Backend used by `glmZiBFit()`: `"glmmTMB"` or `"gamlss"`.
 #' @param scale_continuous If `TRUE`, continuous metadata covariates are z-scored
 #' by `glmZiBFit()`.
-#' @param nthreads Number of threads for parallel processing (default: all available cores).
+#' @param nthreads Number of threads for parallel processing (default 2).
 #' @param return_vcov If `TRUE`, include per-feature variance-covariance matrices in fit.
 #' @param attach_taxonomy If `TRUE` and `taxonomy_path` is provided, append taxonomy columns to top hits.
 #' @param overwrite If `FALSE`, abort when `output_path` already exists.
@@ -160,11 +160,13 @@ strainspy <- function(meta_path, sylph_path, design_formula, coef,
 
   missing_design_cols <- setdiff(design_vars, colnames(meta_data))
   if (length(missing_design_cols) > 0) {
+    missing_txt <- paste(missing_design_cols, collapse = ", ")
+    available_txt <- paste(colnames(meta_data), collapse = ", ")
     stop(
       "Metadata is missing predictor column(s) required by `design_formula`: ",
-      paste(missing_design_cols, collapse = ", "),
+      missing_txt,
       ".\nAvailable metadata columns are: ",
-      paste(colnames(meta_data), collapse = ", "),
+      available_txt,
       "."
     )
   }
@@ -186,9 +188,10 @@ strainspy <- function(meta_path, sylph_path, design_formula, coef,
 
   missing_in_coldata <- setdiff(design_vars, colnames(SummarizedExperiment::colData(se)))
   if (length(missing_in_coldata) > 0) {
+    missing_txt <- paste(missing_in_coldata, collapse = ", ")
     stop(
       "After metadata merge, design variable(s) are missing from `colData(se)`: ",
-      paste(missing_in_coldata, collapse = ", "),
+      missing_txt,
       "."
     )
   }

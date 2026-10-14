@@ -11,9 +11,8 @@ top_hits(fit, coef = 2, method = "holm", alpha = 0.05)
 
 \item{coef}{The coefficient to report and use for p-value adjustment. Defaults to 2.}
 
-\item{method}{The method for p-value adjustment. Available methods are a subset of those in \code{p.adjust},
-specifically those valid for dependent tests. Common choices include "holm", "hochberg", "hommel",
-and "BH" (Benjamini-Hochberg) and "BY".}
+\item{method}{The method for p-value adjustment, passed to \code{p.adjust()}. One of
+"holm" (default), "bonferroni", "BH" (Benjamini-Hochberg) or "BY".}
 
 \item{alpha}{Numeric. Significance threshold for adjusted p-values. Defaults to 0.05.}
 }
@@ -21,9 +20,9 @@ and "BH" (Benjamini-Hochberg) and "BY".}
 A tibble with the top hits, sorted by adjusted p-value.
 }
 \description{
-This function performs multiple testing adjustment on the results of a strainspy_fit object
-integrating taxonomic information. Various correction methods are available,
-including Harmonic Mean P-value (HMP), Bonferroni and Benjamini-Hochberg (BH).
+Adjusts the p-values of one coefficient of a \code{strainspy_fit} for multiple testing with
+\code{p.adjust()} and returns the features that pass \code{alpha}, sorted by adjusted p-value.
+For taxonomy-aware adjustment see \code{hadjust()}.
 }
 \examples{
 meta <- read.csv(system.file("extdata", "example_metadata.csv.gz",

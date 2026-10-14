@@ -15,13 +15,13 @@ extract_strainspy(
 \arguments{
 \item{se}{SummarizedExperiment. A \code{SummarizedExperiment} object containing the assay data and metadata.}
 
-\item{variables}{One or multiple variables in \code{colnames(se@colData)}, except \code{Sample_File}.}
+\item{variables}{One or multiple variables in \code{colnames(colData(se))}, except \code{Sample_file}.}
 
-\item{contigs}{A vector of contigs to generate violin plots}
+\item{contigs}{A character vector of contigs (rownames of \code{se}) to extract.}
 
 \item{taxonomy}{An optional taxonomy file read using strainspy::read_taxonomy (default=NULL).}
 
-\item{drop_zeros}{Bool. If TRUE, ANI or Abundance 0 values will not be included in the violin plot. Default FALSE.}
+\item{drop_zeros}{Bool. If TRUE, rows with an ANI or abundance of 0 are dropped. Default FALSE.}
 }
 \value{
 A long-format \code{data.frame} with sample metadata, contig identity columns,

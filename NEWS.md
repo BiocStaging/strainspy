@@ -1,5 +1,50 @@
 # strainspy news
 
+## strainspy 0.99.3
+
+Bugfixes and package/documentation updates for Bioconductor submission.
+
+### Bug fixes
+
+- `ani_distance()` and `plot_mds()` failed when a taxonomy was supplied:
+  the function body referred to an undefined object `taxa`, which is now fixed.
+- `define_priors(add_dispersion_prior = TRUE)` errored because the internal 
+  helper was called without a required argument. Now the documented 
+  `normal(0,1)` dispersion prior is hardcoded.
+- `plot_manhattan()` passed its default `method = "holm"` to `hadjust()`, which
+  only implements HMP and Bonferroni. Previously, this silently fell back to 
+  Bonferroni. The default is now `NULL`, which resolves to `"HMP"` when a 
+  taxonomy is supplied and `"holm"` otherwise, and `hadjust()` warns when 
+  an unsupported method is given. Default taxonomy Manhattan plots now use HMP.
+- `plot_volcano(contig_names = )`. This input was never used and the supplied
+  names now label the significant hits.
+- Updated all fitters to record `scale_continuous` status in the returned 
+  `strainspy_fit` object.
+- `geom_segment()` layers updated to use `linewidth` instead of `size`, avoid
+  ggplot2 deprecation warning.
+
+### API
+
+- Added new accessors for `strainspy_fit`: `getRowData()`, `getCoefficients()`,
+  `getStdErrors()`, `getPValues()`, `getZIStdErrors()`, `getZIPValues()`,
+  `getVcov()`, `getZIVcov()`, `getDesign()`, `getFamily()`, `getFitCall()`,
+  `getConvergence()` and `isScaleContinuous()`. `strainspy_priors`: 
+  `getPriorsDf()`. Avoiding the need to use @ and `slot()` calls on S4 objects.
+- Fixed typos: `est_disperion_prior` is now `est_dispersion_prior` in 
+  `compute_eb_priors()`, and `scale_continous` is now `scale_continuous` in 
+  `glmQBFit()`.
+- `hadjust()` always required `taxonomy` and the `NULL` default was removed.
+- Unused internal functions `filter_by_presence_and_rescale()`,
+  `filter_by_presence_longitudinal()` and `getDispEst()` were removed.
+- CInternal helpers no longer generate help pages.
+
+### Documentation
+
+- The vignette now has an Installation section with BioConductor instructions, 
+  and the README a containere section.
+- Many minor help-page corrections: argument defaults, swapped descriptions, 
+  stale function names and typos.
+
 ## strainspy 0.99.2
 
 Minor bug fixes and documentation updates.

@@ -1,14 +1,13 @@
 #' Provides the top results of a strainspy_fit object, sorted by adjusted p-value.
 #'
-#' This function performs multiple testing adjustment on the results of a strainspy_fit object
-#' integrating taxonomic information. Various correction methods are available,
-#' including Harmonic Mean P-value (HMP), Bonferroni and Benjamini-Hochberg (BH).
+#' Adjusts the p-values of one coefficient of a `strainspy_fit` for multiple testing with
+#' `p.adjust()` and returns the features that pass `alpha`, sorted by adjusted p-value.
+#' For taxonomy-aware adjustment see `hadjust()`.
 #'
 #' @param fit A `strainspy_fit` object.
 #' @param coef The coefficient to report and use for p-value adjustment. Defaults to 2.
-#' @param method The method for p-value adjustment. Available methods are a subset of those in `p.adjust`,
-#'   specifically those valid for dependent tests. Common choices include "holm", "hochberg", "hommel",
-#'   and "BH" (Benjamini-Hochberg) and "BY". 
+#' @param method The method for p-value adjustment, passed to `p.adjust()`. One of
+#'   "holm" (default), "bonferroni", "BH" (Benjamini-Hochberg) or "BY".
 #' @param alpha Numeric. Significance threshold for adjusted p-values. Defaults to 0.05.
 #' 
 #' @return A tibble with the top hits, sorted by adjusted p-value.
@@ -34,8 +33,8 @@ top_hits <- function(fit, coef=2, method = "holm", alpha=0.05) {
     stop("`coef` must be a single integer index.")
   }
 
-  if (coef < 1 || coef > ncol(fit@coefficients)) {
-    stop(sprintf("`coef` is out of bounds. Choose a value between 1 and %d.", ncol(fit@coefficients)))
+  if (coef < 1 || coef > ncol(getCoefficients(fit))) {
+    stop(sprintf("`coef` is out of bounds. Choose a value between 1 and %d.", ncol(getCoefficients(fit))))
   }
 
   if (!is.numeric(alpha) || length(alpha) != 1 || is.na(alpha) || alpha < 0 || alpha > 1) {
@@ -50,32 +49,30 @@ top_hits <- function(fit, coef=2, method = "holm", alpha=0.05) {
  
   
   # Extract p-values & coefficients
-  res <- tibble::as_tibble(fit@row_data) |>
-    tibble::add_column(coefficient=fit@coefficients[[coef]]) |>
-    tibble::add_column(std_error=fit@std_errors[[coef]]) |>
-    tibble::add_column(p_value=fit@p_values[[coef]]) |>
-    tibble::add_column(p_adjust=p.adjust(fit@p_values[[coef]], method = method)) # |>
-  # dplyr::arrange(p_adjust)
+  res <- tibble::as_tibble(getRowData(fit)) |>
+    tibble::add_column(coefficient=getCoefficients(fit)[[coef]]) |>
+    tibble::add_column(std_error=getStdErrors(fit)[[coef]]) |>
+    tibble::add_column(p_value=getPValues(fit)[[coef]]) |>
+    tibble::add_column(p_adjust=p.adjust(getPValues(fit)[[coef]], method = method))
   
   # Add zero-inflated coefficients if available
-  if (!is.null(fit@zi_coefficients)){
+  if (!is.null(getZICoefficients(fit))){
     res <- res |>
-      tibble::add_column(zi_coefficient=fit@zi_coefficients[[coef]]) |>
-      tibble::add_column(zi_std_error=fit@zi_std_errors[[coef]]) |>
-      tibble::add_column(zi_p_value=fit@zi_p_values[[coef]]) |>
-      tibble::add_column(zi_p_adjust=p.adjust(fit@zi_p_values[[coef]], method = method))  #|>
-    # dplyr::arrange(pmin(p_adjust, zi_p_adjust))
+      tibble::add_column(zi_coefficient=getZICoefficients(fit)[[coef]]) |>
+      tibble::add_column(zi_std_error=getZIStdErrors(fit)[[coef]]) |>
+      tibble::add_column(zi_p_value=getZIPValues(fit)[[coef]]) |>
+      tibble::add_column(zi_p_adjust=p.adjust(getZIPValues(fit)[[coef]], method = method))
   }
   
   ## Arrange by adjusted p_value
-  if(!is.null(fit@zi_coefficients)) {
+  if(!is.null(getZICoefficients(fit))) {
     res <- res |> dplyr::arrange(pmin(p_adjust, zi_p_adjust))
   } else {
     res <- res |> dplyr::arrange(p_adjust)
   }
   
   # Filter on provided alpha
-  if (!is.null(fit@zi_coefficients)){
+  if (!is.null(getZICoefficients(fit))){
     res <- res |> dplyr::filter(pmin(p_adjust, zi_p_adjust) <= alpha)
   } else {
     res <- res |> dplyr::filter(p_adjust <= alpha)
@@ -84,13 +81,12 @@ top_hits <- function(fit, coef=2, method = "holm", alpha=0.05) {
   if(nrow(res) == 0) {
     warning(sprintf("Multiple testing correction using `%s`: No significant associations detected for coef = %d at alpha = %f", method, coef, alpha))
   } else {
-    message("Found ", nrow(res), " tophits for ", names(fit@coefficients)[coef],
+    message("Found ", nrow(res), " tophits for ", names(getCoefficients(fit))[coef],
             " at alpha = ", alpha, " using ", method)
     # shortcut to attach phenotype and other info to top_hits
-    attr(res, "phenotype_coef") = coef
-    # attr(res, "phenotype") = names(fit@coefficients)[coef] # This fails with multifactor variables
-    attr(res, "method") = method
-    attr(res, "alpha") = alpha
+    attr(res, "phenotype_coef") <- coef
+    attr(res, "method") <- method
+    attr(res, "alpha") <- alpha
   }
   
   

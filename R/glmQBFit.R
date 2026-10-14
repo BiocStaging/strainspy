@@ -1,6 +1,5 @@
 #' glmQBFit
-#' TODO: Implement return of vcov info. Patched for compatibility (returns NULL)
-#' 
+#'
 #' This function fits a quasibinomial regression model using `stats::glm()`.
 #'
 #'  
@@ -8,20 +7,24 @@
 #' formula containing only fixed effect parameters, and fits a quasibinomial 
 #' regression model on the assay data.
 #'
+#' Variance-covariance matrices are not returned by this fitter: the `vcov` slot
+#' of the result is `NULL`, so the fit cannot be used with
+#' `comp_ani_diff_and_posthoc_test()`.
+#'
 #' @param se SummarizedExperiment. A `SummarizedExperiment` object containing 
 #' the assay data and metadata.
 #' @param design Formula. A formula to specify fixed effects, e.g., 
 #' ` ~ Age + BMI`.
 #' @param nthreads An integer specifying the number of (CPUs or workers) to use. 
-#' Defaults to one 1.
-#' @param scale_continous Logical. If `TRUE`, all numeric columns in 
-#' `colData(se)` are z-score standardized (mean = 0, SD = 1). Default `FALSE`.
+#' Defaults to 1.
+#' @param scale_continuous Logical. If `TRUE`, all numeric columns in 
+#' `colData(se)` are z-score standardized (mean = 0, SD = 1). Default `TRUE`.
 #' @param BPPARAM Optional `BiocParallelParam` object. If not provided, the 
 #' function will configure an appropriate backend automatically.
 #' @param progress Logical. If `TRUE` (default), progress bars and progress messages are printed. Set to `FALSE` to silence them.
 #'
 #' @return A `strainspy_fit` object with the following components:
-#' \item{row_data}{A DFrame with 6 slots with feature details}
+#' \item{row_data}{The `rowData` of `se` for the fitted features}
 #' \item{coefficients}{A DFrame with coefficients for each feature}
 #' \item{std_errors}{A DFrame of standard errors for each feature}
 #' \item{p_values}{A DFrame of p-values for each feature}
@@ -48,7 +51,7 @@
 #'
 #' fit <- glmQBFit(se[1:10,], design, nthreads=2)
 #' @export
-glmQBFit <- function(se, design, nthreads=1L, scale_continous=TRUE, BPPARAM=NULL,
+glmQBFit <- function(se, design, nthreads=1L, scale_continuous=TRUE, BPPARAM=NULL,
                      progress=TRUE) {
   check_progress(progress)
   
@@ -57,34 +60,21 @@ glmQBFit <- function(se, design, nthreads=1L, scale_continous=TRUE, BPPARAM=NULL
     stop("`se` must be a SummarizedExperiment object.")
   }
   
-  # colData (sample metadata)
+  # Sample metadata from colData
   col_data <- SummarizedExperiment::colData(se)
-  if (scale_continous==TRUE){
-    for (col in names(col_data)) {
-      if (is.numeric(col_data[[col]])) {
-        col_data[[col]] <- scale(col_data[[col]])  # Scale numeric columns
-      }
-    }
+  if (scale_continuous==TRUE){
+    col_data <- scale_numeric_columns(col_data)
   }
   
-  # Ensure the design is a formula
-  if (!inherits(design, "formula")) {
-    stop("`design` must be a formula (e.g., ~ batch + condition).")
-  }
-  
-  # check if formula is valid
-  nbd = nobars_(design)
-  if(is.null(nbd)){
-    stop(paste(paste(design, collapse = ''), "--- is not a valid formula."))
-  } 
+  # Ensure the design is a valid formula
+  nbd <- check_design_formula(design)
   
   if (!isTRUE(all.equal(nbd, design))) {
+    design_txt <- paste(design, collapse = "")
     stop(
-      paste0(
-        "The model formula `", paste(design, collapse = ""), "` contains random effect terms, which are unsupported in `glmQBFit()`. \nConsider using:\n",
-        "  - `glmObFit()`\n",
-        "  - `glmZiBFit()`\n"
-      )
+      "The model formula `", design_txt, "` contains random effect terms, which are unsupported in `glmQBFit()`. \nConsider using:\n",
+      "  - `glmObFit()`\n",
+      "  - `glmZiBFit()`\n"
     )
   }
   
@@ -98,20 +88,7 @@ glmQBFit <- function(se, design, nthreads=1L, scale_continous=TRUE, BPPARAM=NULL
   
   
   # Set up parallel infrastructure
-  if ((nthreads > 1) & (.Platform$OS.type != "windows")) {
-    # Check the operating system and set the backend accordingly
-    if (is.null(BPPARAM)) {
-      # Use MulticoreParam for Unix-like systems
-      # BPPARAM <- BiocParallel::MulticoreParam(
-      #   workers = nthreads
-      # )
-      BPPARAM <- BiocParallel::SnowParam(workers = nthreads, progressbar = progress, tasks=100)
-    } else if (!progress) {
-      BiocParallel::bpprogressbar(BPPARAM) <- FALSE
-    }
-  } else {
-    BPPARAM <- BiocParallel::SerialParam(progressbar = progress)
-  }
+  BPPARAM <- setup_bpparam(nthreads, BPPARAM, progress, tasks = 100)
   
   # Split rows into 50-row chunks
   row_chunks <- split(
@@ -136,17 +113,18 @@ glmQBFit <- function(se, design, nthreads=1L, scale_continous=TRUE, BPPARAM=NULL
   
   # sometimes results can be an empty list, remove those dynamically
   # Drop features whose fit failed; handles both backend failure protocols.
-  rmidx = failed_fit_index(results)
+  rmidx <- failed_fit_index(results)
   
   if(length(rmidx) > 0) {
-    seRD = SummarizedExperiment::rowData(se)[-rmidx, , drop = FALSE]
+    seRD <- SummarizedExperiment::rowData(se)[-rmidx, , drop = FALSE]
     results[rmidx] <- NULL
   } else {
-    seRD = SummarizedExperiment::rowData(se)
+    seRD <- SummarizedExperiment::rowData(se)
   }
   # Create the strainspy_fit object
   QBGLM <- new("strainspy_fit",
                row_data = seRD,
+               scale_continuous = scale_continuous,
                coefficients = DataFrame(purrr::map_dfr(results, ~ .x[[1]][,1])),
                std_errors = DataFrame(purrr::map_dfr(results, ~ .x[[1]][,2])),
                p_values = DataFrame(purrr::map_dfr(results, ~ .x[[1]][,4])),
@@ -173,6 +151,7 @@ glmQBFit <- function(se, design, nthreads=1L, scale_continous=TRUE, BPPARAM=NULL
 #' @param combined_formula The formula for the conditional mean model.
 #' @return A list where each element contains per-feature fitted coefficients,
 #' residuals, and convergence status.
+#' @noRd
 fit_qb_model <- function(se_subset, col_data, combined_formula) {
   chunk_results <- lapply(seq_len(nrow(se_subset)), function(row_index){
     ## Extract the values for the current feature
@@ -201,7 +180,6 @@ fit_qb_model <- function(se_subset, col_data, combined_formula) {
       coefficients = smry$coefficients,
       coefficients_zi = NULL,
       residuals = stats::residuals(fit, type = "response"),
-      # log_likelihood = fit$fit$objective,
       convergence = fit$converged
     ))
   })

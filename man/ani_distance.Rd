@@ -14,7 +14,7 @@ ani_distance(
 \arguments{
 \item{se}{A \code{SummarizedExperiment} object.}
 
-\item{taxonomy}{An optional \code{data.frame} object containing the taxonomy information for the samples in \code{se}.
+\item{taxonomy}{An optional \code{data.frame} containing the taxonomy of the genomes (rows) in \code{se}.
 The result of running read_taxonomy on the taxonomy file associated with the ANI data.
 If provided, the ANI values will be collapsed at the specified taxonomic level before calculating the distance matrix. (default=NULL)}
 
@@ -23,7 +23,7 @@ If provided, the ANI values will be collapsed at the specified taxonomic level b
 \item{collapse_method}{A character string specifying the method to use to collapse the ANI values. Must be one of 'representative', 'mean' or 'max'. (default='representative')}
 }
 \value{
-A distance matrix.
+A \code{dist} object of distances between samples.
 }
 \description{
 This function calculates the distance between samples in a \code{SummarizedExperiment} object representing strain level ANI data.
@@ -35,6 +35,6 @@ tax_path <- system.file("extdata", "example_taxonomy.tsv.gz",
 package = "strainspy")
 se <- read_sylph(example_path)
 tax <- read_taxonomy(tax_path)
-distance_matrix <- ani_distance(se)
+distance_matrix <- ani_distance(se, tax)
 
 }

@@ -24,35 +24,34 @@ assay data and metadata}
 
 \item{fit}{A fitted \code{strainspy_fit}model}
 
-\item{th}{\code{tibble} returned by \code{top_hits()}.}
+\item{th}{The table returned by \code{top_hits()} (required).}
 
-\item{simplified_formula}{A formula to use instead of \code{fit@design}, useful
+\item{simplified_formula}{A formula to use instead of \code{getDesign(fit)}, useful
 when the original design was too complex and causes emmeans to fail during
 ANI estimation (default NULL).}
 
-\item{beta_min_nz}{Minimum non-zero proportion per phenotype group required
-to consider a beta hit is well supported. Hits driven by a proportion
-of non zero values below this threshold at least in one phenotype group are
-flagged \verb{too few nonzero}. Default 0.1. Hits driven by less than or equal to
-3 observations will be flagged automatically \verb{<3 nonzero}.}
+\item{beta_min_nz}{Minimum proportion of non-zero values per phenotype group for
+a beta hit to be considered well supported. Hits where that proportion falls below
+this threshold in at least one group are flagged \verb{too few nonzero}. Default 0.1.
+Hits supported by 3 or fewer observations are always flagged \verb{<3 nonzero}.}
 
 \item{beta_min_ani_diff}{Minimum absolute mean ANI difference required  for
-a beta hit to be considered meaningful. Effect sizes small than this are
-flagged: \verb{small effect}. Default = 1.5e-3 corresponds to 0.15\% delta ANI.}
+a beta hit to be considered meaningful. Effect sizes smaller than this are
+flagged: \verb{small effect}. Default = 1.5e-2, i.e. 1.5 percentage points of ANI.}
 
 \item{nthreads}{Number of threads for parallel processing. Default \code{1}.}
 
-\item{reorder_hits}{Logical. Return \code{th} after reordering hits to priorities
-best supported ones. Default \code{FALSE}.}
+\item{reorder_hits}{Logical. Return \code{th} after reordering hits to prioritise
+the best-supported ones. Default \code{FALSE}.}
 
 \item{BPPARAM}{Optional BiocParallelParam object.}
 
 \item{progress}{Logical. If \code{TRUE} (default), progress bars and progress messages are printed. Set to \code{FALSE} to silence them.}
 }
 \value{
-A \code{tibble} similar to \code{th}, with added columns giving details on:
+A \code{data.frame} similar to \code{th}, with added columns giving details on:
 Component (Beta, ZI or both), Mean ANI_Difference, Contrast, Non-Zero Counts
-of contrast components, and a general \code{Comment} on each hit. The commetn will
+of contrast components, and a general \code{Comment} on each hit. The comment will
 be \code{NA} if the hit passes all posthoc tests.
 }
 \description{
@@ -60,7 +59,7 @@ In the zero-inflated beta model, beta effects represent changes in
 strain identity and are modeled on the logit scale. While this scale
 is effective for distinguishing phenotype groups statistically, the
 resulting effect sizes are not directly interpretable as differences
-in mean ANI. Same applies for effect sizes from the ordinal beta model.
+in mean ANI. The same applies to effect sizes from the ordinal beta model.
 }
 \details{
 This function converts logit-scale beta effects into response-scale
@@ -74,9 +73,9 @@ observations supporting each beta effect. Second, it compares the estimated
 mean ANI difference against a preset threshold. A comment is added to each
 hit depending on the outcome.
 
-By default, this function uses the formula from \code{fit@design}. However, if the
+By default, this function uses the formula from \code{getDesign(fit)}. However, if the
 formula contains multiple covariates, this can cause emmeans to behave
-unexpectedly. For example, if \code{fit@design = ~ disease + age + sex + country + (1|study)},
+unexpectedly. For example, if \code{getDesign(fit)} is \code{~ disease + age + sex + country + (1|study)},
 this can cause this function to throw errors or warnings.  Using a \code{simplified_formula = ~ disease}
 to override can be a useful approach.
 

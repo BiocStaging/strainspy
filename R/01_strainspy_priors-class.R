@@ -8,7 +8,7 @@
 #' @slot boot_fixef Numeric matrix. Bootstrap SD values for fixed effect priors
 #' @slot boot_fixef_ZI Numeric matrix. Bootstrap SD values for zero inflated fixed effect priors
 #' @slot boot_disp Numeric matrix. Bootstrap mean and SD values for the dispersion term of beta component.
-#' @slot design The formula with with effect terms used
+#' @slot design The formula with the effect terms used
 #' @slot call The matched call of the model.
 #'
 #' @export
@@ -74,9 +74,7 @@ methods::setMethod("show", "strainspy_priors", function(object) {
   if (!is.null(object@priors_df) && nrow(object@priors_df) > 0) {
     cat("Priors:\n")
     tab <- table(object@priors_df$class)
-    for (cl in names(tab)) {
-      cat(" -", cl, ":", tab[[cl]], "coefficients\n")
-    }
+    cat(sprintf(" - %s : %d coefficients\n", names(tab), as.integer(tab)), sep = "")
     
     cat("\nExample priors:\n")
     print(utils::head(object@priors_df, 5))
@@ -113,11 +111,11 @@ methods::setMethod("show", "strainspy_priors", function(object) {
   invisible(object)
 })
 
-#' Plot method for strainspy_priors objects
+#' Plot the bootstrap distributions behind a strainspy_priors object
 #'
 #' @param object An object of class \code{strainspy_priors} that has bootstrap information
-#' @param prior Prior to be plotted
-#' @return Invisibly returns the object
+#' @param prior Name of the coefficient whose bootstrap SD to plot, or "dispersion".
+#' @return A `patchwork` of `ggplot2` histograms.
 #' @examples
 #' methods::hasMethod("plot_prior_bootstrap", "strainspy_priors")
 #' @export
@@ -130,10 +128,6 @@ methods::setMethod("plot_prior_bootstrap", signature(object = "strainspy_priors"
                      
                      if (object@method != "empirical") {
                        stop("Bootstrap plots are only available for 'empirical' method objects.")
-                     }
-                     
-                     if (!requireNamespace("ggplot2", quietly = TRUE) || !requireNamespace("patchwork", quietly = TRUE)) {
-                       stop("Please install 'ggplot2' and 'patchwork' to use this plotting function.")
                      }
                      
                      # Internal plotting logic to keep code DRY
@@ -201,3 +195,26 @@ methods::setMethod("extract_fixef_priors", "strainspy_priors", function(object) 
     object@priors_df[object@priors_df$class == "fixef", ]
   }
 })
+
+#' Access the prior specification table
+#'
+#' Returns the full prior `data.frame` stored in a `strainspy_priors` object,
+#' including both fixed-effect and zero-inflation rows. See
+#' `extract_fixef_priors()` for the fixed-effect rows only.
+#'
+#' @param object An object of class `strainspy_priors`.
+#' @return A `data.frame` with columns `prior`, `class` and `coef`.
+#' @examples
+#' meta <- read.csv(system.file("extdata", "example_metadata.csv.gz",
+#' package = "strainspy"))
+#' meta$Case_status <- factor(meta$Case_status)
+#' se <- read_sylph(system.file("extdata", "example_sylph_profile.tsv.gz",
+#' package = "strainspy"), meta_data = meta)
+#' pr <- define_priors(se, ~ Case_status + Age_at_collection, method = "preset_weak")
+#' getPriorsDf(pr)
+#' @export
+methods::setGeneric("getPriorsDf", function(object) methods::standardGeneric("getPriorsDf"))
+
+#' @rdname getPriorsDf
+#' @export
+methods::setMethod("getPriorsDf", "strainspy_priors", function(object) object@priors_df)

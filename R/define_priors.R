@@ -1,19 +1,19 @@
 #' Constructor for strainspy_priors using empirical Bayes estimation
 #'
 #' Fits fast binomial and beta models to estimate MAP prior SDs for use in 
-#' zero-inflated and ordinal beta models fitted using `GLMMTMB`. 
+#' zero-inflated and ordinal beta models fitted using `glmmTMB`. 
 #' 
 #' @importFrom stats quantile
 #' 
-#' @param se A \code{SummarizedExperiment} object with count matrix and colData.
+#' @param se A \code{SummarizedExperiment} object with the assay matrix and colData.
 #' @param design A fixed-effects-only formula (e.g., ~ group + age + sex).
 #' @param nthreads An integer specifying the number of (CPUs or workers) to use. Defaults
-#'        to one 1.
+#'        to 1.
 #' @param BPPARAM Optional `BiocParallelParam` object. If not provided, the function
 #'        will configure an appropriate backend automatically.
-#' @param low_cutoff Ceiling for small SD estimates. Default 0.1
-#' @param high_cutoff Floor for large SD estimates. Default 10
-#' @param est_disperion_prior Estimate a prior for disperion (default = FALSE)
+#' @param low_cutoff Floor for small SD estimates; values below it are raised to it. Default 0.1
+#' @param high_cutoff Ceiling for large SD estimates; values above it are capped at it. Default 10
+#' @param est_dispersion_prior Estimate a prior for dispersion (default = FALSE)
 #' @param progress Logical. If `TRUE` (default), progress bars and progress messages are printed. Set to `FALSE` to silence them.
 #' @return An object of class \code{strainspy_priors}.
 #' @examples
@@ -35,15 +35,11 @@
 #' @export
 compute_eb_priors <- function(se, design, nthreads = 1L, BPPARAM = NULL,
                               low_cutoff = 0.1, high_cutoff = 10,
-                              est_disperion_prior = FALSE, progress = TRUE) {
+                              est_dispersion_prior = FALSE, progress = TRUE) {
   
   check_progress(progress)
   
-  required_pkgs <- c("fastglm", "betareg")
-  missing_pkgs <- required_pkgs[!vapply(required_pkgs, requireNamespace,
-                                        logical(1), quietly = TRUE)]
-  if (length(missing_pkgs) > 0)
-    stop("Missing packages: ", paste(missing_pkgs, collapse = ", "))
+  require_suggested(c("fastglm", "betareg"), "empirical Bayes priors")
   
   stopifnot(inherits(se, "SummarizedExperiment"))
   stopifnot(inherits(design, "formula"))
@@ -53,9 +49,7 @@ compute_eb_priors <- function(se, design, nthreads = 1L, BPPARAM = NULL,
   chunk_size <- 500
   
   cd <- as.data.frame(SummarizedExperiment::colData(se))
-  for (col in names(cd))
-    if (is.numeric(cd[[col]]))
-      cd[[col]] <- scale(cd[[col]])
+  cd <- scale_numeric_columns(cd)
   
   mx_pred <- stats::model.matrix(design, cd)
   mx_outcome <- SummarizedExperiment::assay(se)
@@ -71,16 +65,7 @@ compute_eb_priors <- function(se, design, nthreads = 1L, BPPARAM = NULL,
                        function(idxs) mx_outcome[idxs, , drop = FALSE])
   
   # parallel backend
-  if ((nthreads > 1) & (.Platform$OS.type != "windows")) {
-    if (is.null(BPPARAM)) {
-      BPPARAM <- BiocParallel::SnowParam(workers = nthreads,
-                                         progressbar = progress)
-    } else if (!progress) {
-      BiocParallel::bpprogressbar(BPPARAM) <- FALSE
-    }
-  } else {
-    BPPARAM <- BiocParallel::SerialParam(progressbar = progress)
-  }
+  BPPARAM <- setup_bpparam(nthreads, BPPARAM, progress)
   
   ## --------------------
   ## ZI priors
@@ -112,7 +97,7 @@ compute_eb_priors <- function(se, design, nthreads = 1L, BPPARAM = NULL,
   rx_beta <- BiocParallel::bplapply(chunk_list,
                                     beta_chunk,
                                     mx_pred = mx_pred,
-                                    est_disp = est_disperion_prior,
+                                    est_disp = est_dispersion_prior,
                                     BPPARAM = BPPARAM)
   
   coef_list <- unlist(lapply(rx_beta, `[[`, "coefs"), recursive = FALSE)
@@ -137,7 +122,7 @@ compute_eb_priors <- function(se, design, nthreads = 1L, BPPARAM = NULL,
   boot_disp <- matrix(numeric(0), nrow = 0, ncol = 0)
   disp_prior <- NULL
   
-  if (isTRUE(est_disperion_prior)) {
+  if (isTRUE(est_dispersion_prior)) {
     
     log_phi_vec <- unlist(lapply(rx_beta, `[[`, "log_phi"))
     log_phi_vec <- log_phi_vec[is.finite(log_phi_vec)]
@@ -145,14 +130,12 @@ compute_eb_priors <- function(se, design, nthreads = 1L, BPPARAM = NULL,
     if (length(log_phi_vec) > 5) {
       
       B <- 1000
-      boot_sd <- numeric(B)
-      boot_mean <- numeric(B)
-      
-      for (b in seq_len(B)) {
+      boots <- replicate(B, {
         samp <- sample(log_phi_vec, replace = TRUE)
-        boot_sd[b] <- sd(samp)
-        boot_mean[b] <- mean(samp)
-      }
+        c(sd = sd(samp), mean = mean(samp))
+      })
+      boot_sd <- boots["sd", ]
+      boot_mean <- boots["mean", ]
       
       # This is likely more stable than estimating values from log_phi
       disp_sd <- median(boot_sd)
@@ -214,11 +197,11 @@ compute_eb_priors <- function(se, design, nthreads = 1L, BPPARAM = NULL,
 
 #' Constructor for strainspy_priors using preset or user defined priors
 #' 
-#' @param se A \code{SummarizedExperiment} object with count matrix and colData.
+#' @param se A \code{SummarizedExperiment} object with the assay matrix and colData.
 #' @param design A fixed-effects-only formula (e.g., ~ group + age + sex).
 #' @param method Prior type ("preset_weak", "preset_strong", "manual"). To compute 
 #' empirical priors, use `compute_eb_priors()`. Default `preset_weak`.
-#' @param add_dispersion_prior Add a prior of normal(0,1) to the dispersion parameter. Default False
+#' @param add_dispersion_prior Add a prior of normal(0,1) to the dispersion parameter. Default `FALSE`
 #' @param priors_df NULL if `method == 'preset_weak' | 'preset_strong'`, else a 
 #' data.frame of priors suitable for glmmTMB model fitting. See `?glmmTMB::priors`
 #' for more details. Default NULL.
@@ -234,7 +217,7 @@ compute_eb_priors <- function(se, design, nthreads = 1L, BPPARAM = NULL,
 #' class(pri)
 #' 
 #' @export
-define_priors = function(se, design, method = 'preset_weak', add_dispersion_prior = FALSE, priors_df = NULL){
+define_priors <- function(se, design, method = 'preset_weak', add_dispersion_prior = FALSE, priors_df = NULL){
   stopifnot(inherits(se, "SummarizedExperiment"))
   stopifnot(inherits(design, "formula"))
   ## Check if formula has random effects
@@ -246,12 +229,12 @@ define_priors = function(se, design, method = 'preset_weak', add_dispersion_prio
   term_names <- colnames(mx_pred)
   
   if (method %in% c("preset_weak", "preset_strong")) {
-    intercept_idx = grep("(Intercept)", term_names, fixed = TRUE)
+    intercept_idx <- grep("(Intercept)", term_names, fixed = TRUE)
     if(length(intercept_idx) == 1){
       # Leaving the intercept unpenalised is intended behaviour on the default
       # path, so inform rather than warn (this fires on every default fit).
       message("No MAP prior will be set on the intercept.")
-      term_names = term_names[-intercept_idx]
+      term_names <- term_names[-intercept_idx]
     }
     
     priors_df <- get_preset_priors(term_names, method)
@@ -266,7 +249,8 @@ define_priors = function(se, design, method = 'preset_weak', add_dispersion_prio
     required_cols <- c("prior", "class", "coef")
     missing_cols <- setdiff(required_cols, colnames(priors_df))
     if (length(missing_cols) > 0) {
-      stop("Manual prior data.frame is missing required column(s): ", paste(missing_cols, collapse = ", "))
+      missing_txt <- paste(missing_cols, collapse = ", ")
+      stop("Manual prior data.frame is missing required column(s): ", missing_txt)
     }
     
     warning("No checks will be performed on the provided `prior`, check `?glmmTMB::priors` for details")
@@ -347,49 +331,8 @@ beta_chunk <- function(chunk, mx_pred, est_disp = FALSE) {
   return(out)
 }
 
-
-
-getDispEst <- function(log_phi_vec, B = 2000, trim = 0.02, seed = NULL) {
-  
-  if (!is.null(seed)) {
-    warning("`seed` is ignored to comply with Bioconductor policy against set.seed() in package code.")
-  }
-  
-  x <- log_phi_vec[is.finite(log_phi_vec)]
-  
-  # optional trimming
-  if (!is.null(trim) && trim > 0) {
-    lo <- stats::quantile(x, trim)
-    hi <- stats::quantile(x, 1 - trim)
-    x <- x[x > lo & x < hi]
-  }
-  
-  # point estimates
-  mu_hat <- mean(x)
-  sd_hat <- sd(x)
-  
-  # bootstrap
-  boot_mu <- numeric(B)
-  boot_sd <- numeric(B)
-  
-  for (b in seq_len(B)) {
-    samp <- sample(x, replace = TRUE)
-    boot_mu[b] <- mean(samp)
-    boot_sd[b] <- sd(samp)
-  }
-  
-  list(
-    mu      = mu_hat,
-    sd      = sd_hat,
-    mu_ci   = quantile(boot_mu, c(0.025, 0.975)),
-    sd_ci   = quantile(boot_sd, c(0.025, 0.975)),
-    boot_mu = boot_mu,
-    boot_sd = boot_sd
-  )
-}
-
 getEst <- function(rx, idx){
-  estV = rx[,idx] 
+  estV <- rx[,idx] 
   boot_sd <- replicate(1000, {
     sample_est <- sample(estV, replace = TRUE)
     stats::sd(sample_est)
@@ -446,7 +389,7 @@ make_prior_df <- function(term_names,
   )
 }
 
-get_preset_priors = function(term_names, type = c("preset_weak", "preset_strong")) {
+get_preset_priors <- function(term_names, type = c("preset_weak", "preset_strong")) {
   type <- match.arg(type)
   sd <- if (type == "preset_weak") 5 else 1
   sd_vec <- rep(sd, length(term_names))
@@ -462,7 +405,7 @@ get_preset_priors = function(term_names, type = c("preset_weak", "preset_strong"
   )
 }
 
-get_dispersion_prior = function(sd){
+get_dispersion_prior <- function(sd = 1){
   warning("Mean of dispersion prior is forced to 0. This is not recommended! 
           ... If you want to estimate it, use compute_eb_priors() instead")
   data.frame(

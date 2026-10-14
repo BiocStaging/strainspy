@@ -23,18 +23,19 @@ leaving only the base file name. Defaults to \code{TRUE}.}
 }
 \value{
 A SummarizedExperiment object with the following components:
-\item{assays}{A matrix containing numeric features such as \code{Adjusted_ANI}, \code{Taxonomic_abundance}, \code{Median_cov}, etc.}
+\item{assays}{A matrix of the selected \code{variable}, by default \code{match_containment_ani}.}
 \item{rowData}{DataFrame containing metadata for each sequence, such as \code{Contig_name} and \code{Genome_file}.}
 \item{colData}{DataFrame containing information for each sample (derived from the \code{Sample_file} field).}
 }
 \description{
-This function reads a \verb{sourmash gather} or \verb{sourmash search} -like output CSV file and create a SummarizedExperiment object.
+This function reads a \verb{sourmash gather} or \verb{sourmash search} -like output CSV file and creates a SummarizedExperiment object.
 An optional metadata table can be provided and added directly to \code{colData} via an internal call to \code{modify_metadata()}.
 }
 \note{
-Some of sourmash subcommands like \code{gather} are designed to take exactly one query file.
-To merge and save a CSV file suitable to use with this function, use \code{merge_sourmash_files()}
-#' If metadata is provided, it must meet the input requirements described in
+Some sourmash subcommands, like \code{gather}, are designed to take exactly one query file.
+To merge and save a CSV file suitable to use with this function, use \code{merge_sourmash_files()}.
+
+If metadata is provided, it must meet the input requirements described in
 \code{modify_metadata()}. If appending metadata fails due to pre processing requirements,
 this function will issue a detailed warning and still return the \code{SummarizedExperiment}
 object without metadata. In that case, apply necessary fixes and subsequently

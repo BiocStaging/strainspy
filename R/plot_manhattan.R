@@ -31,14 +31,17 @@
 #' @param coef The number of the coefficient from which to generate the plot (default=2).
 #' @param taxonomy An optional taxonomy file read using strainspy::read_taxonomy (default=NULL).
 #' @param aggregate_by_taxa Logical. If TRUE, aggregate p-values across `tax_levels` and visualise as a stacked segment plot. Requires `taxonomy`. If NULL (default), the function automatically sets it to TRUE when `taxonomy` is provided.
-#' @param method Character. Multiple testing correction method for p-values (e.g., "holm"). Defaults to "holm". Only applicable if `aggregate_by_taxa = TRUE`.
+#' @param method Character. Multiple testing correction method. With `taxonomy`, it is passed to
+#' `hadjust()` and must be "HMP" or "bonferroni"; without, it is passed to `top_hits()` and must be
+#' one of "holm", "bonferroni", "BH" or "BY". Default `NULL`, meaning "HMP" with a taxonomy and
+#' "holm" without.
 #' @param alpha Numeric. Significance threshold for adjusted p-values. Defaults to 0.05.
 #' @param tax_levels Character vector. Subset of taxonomic levels: c("Domain", "Phylum", "Class", "Order", "Family", "Genus", "Species", "Strain") to include in the plot.
 #' Defaults to c("Phylum", "Genus", "Species", "Strain"). Provided levels will be reordered by the standard hierarchy and the highest level is used for colouring. If it has >30 categories, 
 #' the legend is replaced by a named vector. Only applicable with `aggregate_by_taxa = TRUE`.
 #' @param plot If set to false, the function will return a tibble with data used to generate the plot. NOTE: Will be disregarded if taxonomy is provided with the option `aggregate_by_taxa = FALSE`.
 #' 
-#' @return A `ggplot` object showing the Manhattan plot if `plot = TRUE`, else a `data.frame` with plot data.
+#' @return A `ggplot` object showing the Manhattan plot if `plot = TRUE`, else a tibble with the plot data.
 #' @examples
 #' meta <- read.csv(system.file("extdata", "example_metadata.csv.gz", 
 #' package = "strainspy"))
@@ -54,7 +57,7 @@
 #' head(mh_data)
 #' 
 #' @export
-plot_manhattan <- function(object, coef=2, taxonomy=NULL, aggregate_by_taxa = NULL, method = "holm",
+plot_manhattan <- function(object, coef=2, taxonomy=NULL, aggregate_by_taxa = NULL, method = NULL,
                            alpha=0.05, tax_levels = c("Phylum", "Genus", "Species", "Strain"), plot=TRUE) {
   
   # sanity checks
@@ -68,6 +71,11 @@ plot_manhattan <- function(object, coef=2, taxonomy=NULL, aggregate_by_taxa = NU
     aggregate_by_taxa <- !is.null(taxonomy)
   }
   
+  # Default adjustment: HMP via hadjust() with a taxonomy, holm via top_hits() without
+  if (is.null(method)) {
+    method <- if (!is.null(taxonomy)) "HMP" else "holm"
+  }
+  
   # Consistency check
   if (isTRUE(aggregate_by_taxa) && is.null(taxonomy)) {
     stop("Cannot aggregate by taxa without providing taxonomy.")
@@ -79,9 +87,9 @@ plot_manhattan <- function(object, coef=2, taxonomy=NULL, aggregate_by_taxa = NU
   # do some sanity checks
   tax_levels <- intersect(tax_levels_, tax_levels) # drop and reorder
   
-  if(!"Strain" %in% tax_levels) tax_levels = c(tax_levels, "Strain")
+  if(!"Strain" %in% tax_levels) tax_levels <- c(tax_levels, "Strain")
   
-  col_tax_level = tax_levels[1] # choose top level for colouring
+  col_tax_level <- tax_levels[1] # choose top level for colouring
   
   
   if (!is.null(taxonomy)) {
@@ -101,11 +109,11 @@ plot_manhattan <- function(object, coef=2, taxonomy=NULL, aggregate_by_taxa = NU
     plot_data$Level <- factor(plot_data$Level, tax_levels_)
     
     ### issue a warning if the chosen colour has many categories
-    legend_ = TRUE
-    n_levels = length(table(plot_data$Name[plot_data$Level == col_tax_level]))
+    legend_ <- TRUE
+    n_levels <- length(table(plot_data$Name[plot_data$Level == col_tax_level]))
     if(n_levels > 30){
       warning(sprintf("There are %d categories of `%s`. Legends >30 are omitted from figure and printed to console.", n_levels, col_tax_level))
-      legend_ = FALSE
+      legend_ <- FALSE
     }
     
     
@@ -113,12 +121,12 @@ plot_manhattan <- function(object, coef=2, taxonomy=NULL, aggregate_by_taxa = NU
     # Add sequence level adjusted p-values
     hits <- top_hits(object, coef=coef, method = method, alpha = 1)
     
-    plot_data <- hits[,c(colnames(object@row_data), "p_adjust")] |>
+    plot_data <- hits[,c(colnames(getRowData(object)), "p_adjust")] |>
       tibble::add_column(Model="Beta", .before=1)
     
     if ('zi_p_adjust' %in% colnames(hits)) {
       plot_data <- rbind(plot_data,
-                         hits[,c(colnames(object@row_data), "zi_p_adjust")] |>
+                         hits[,c(colnames(getRowData(object)), "zi_p_adjust")] |>
                            dplyr::rename(p_adjust = "zi_p_adjust") |>
                            tibble::add_column(Model="Zero-Inflated", .before=1))
     }
@@ -159,17 +167,16 @@ plot_manhattan <- function(object, coef=2, taxonomy=NULL, aggregate_by_taxa = NU
       return(plot_data)
     }
     
-    custom_colors = colour_by_tax(genomes = plot_data$Name[which(plot_data$Level == "Strain")], taxonomy = taxonomy,
+    custom_colors <- colour_by_tax(genomes = plot_data$Name[which(plot_data$Level == "Strain")], taxonomy = taxonomy,
                                   tax_levels = tax_levels)
     plot_data[[col_tax_level]] <- factor(
       plot_data[[col_tax_level]],
       levels = names(custom_colors)
-      # levels =  unique(plot_data[[col_tax_level]][order(plot_data$index_max)]) # ordering colours in the plot from left to right
     )
     
     
     gg <- ggplot2::ggplot(plot_data, ggplot2::aes(x = Name, y = log_p_adjust, colour=.data[[col_tax_level]])) +
-      ggplot2::geom_segment(ggplot2::aes(y = log_p_adjust, x = index_min - 0.5, xend = index_max + 0.5), size=5) +
+      ggplot2::geom_segment(ggplot2::aes(y = log_p_adjust, x = index_min - 0.5, xend = index_max + 0.5), linewidth = 5) +
       ggplot2::facet_grid(Level ~ Model, scales = "free_x") +
       ggplot2::geom_hline(ggplot2::aes(yintercept = -log10(alpha)), col='red', linetype = "dotted") +
       ggplot2::scale_color_manual(values = custom_colors) +
@@ -190,8 +197,8 @@ plot_manhattan <- function(object, coef=2, taxonomy=NULL, aggregate_by_taxa = NU
       categories <- unique(plot_data[[col_tax_level]][order(plot_data$index_max)])
       colors_assigned <- custom_colors[seq_along(categories)]
       names(colors_assigned) <- categories
-      message("Colour legend:\n",
-              paste0("  ", names(colors_assigned), ": ", colors_assigned, collapse = "\n"))
+      legend_txt <- paste0("  ", names(colors_assigned), ": ", colors_assigned, collapse = "\n")
+      message("Colour legend:\n", legend_txt)
     }
     
   } else {
@@ -220,7 +227,7 @@ plot_manhattan <- function(object, coef=2, taxonomy=NULL, aggregate_by_taxa = NU
   return(gg)
 }
 
-#' Generate a `conventional` Manhattan plot for the strain all strains. 
+#' Generate a `conventional` Manhattan plot for all strains. 
 #'
 #' @importFrom ggtree ggtree %<+% theme_tree2 geom_tippoint
 #' @importFrom ggplot2 ggplot aes geom_point scale_color_manual geom_hline labs theme element_text element_blank
@@ -234,6 +241,7 @@ plot_manhattan <- function(object, coef=2, taxonomy=NULL, aggregate_by_taxa = NU
 #' @param coef The number of the coefficient from which to generate the plot (default=2).
 #'
 #' @return A `ggplot` object showing the Manhattan plot combined with the taxonomic tree
+#' @noRd
 plot_manhattan_tree <- function(object, taxonomy, coef = 2) {
   
   if (!inherits(object, "strainspy_fit")) {
@@ -242,24 +250,20 @@ plot_manhattan_tree <- function(object, taxonomy, coef = 2) {
   
   # tax_levels and colour_level must be in tax_levels
   tax_levels_ <- c("Domain", "Phylum", "Class", "Order", "Family", "Genus", "Species", "Strain")
-  # tax_levels = c("Domain", "Phylum", "Genus", "Species", "Strain")
-  # # do some sanity checks
-  # tax_levels <- intersect(tax_levels_, tax_levels) # drop and reorder
-  # col_tax_level = tax_levels[1] # choose top level for colouring
   
   # Create tidy tibbles for plotting
   # Add taxonomic informed adjusted p-values
   plot_data_ <- hadjust(object, coef=coef, taxonomy = taxonomy,
-                        method = "holm", index_range = TRUE)[, c('Level', 'Model', 'Name', 'p_adjust', 'index_min', 'index_max')]
+                        method = "HMP", index_range = TRUE)[, c('Level', 'Model', 'Name', 'p_adjust', 'index_min', 'index_max')]
   
   
   # number of models we need to plot for (only applies to zib/beta vs others for now)
-  models = unique(plot_data_$Model)
-  p_tree = list()
-  p_mh = list()
+  models <- unique(plot_data_$Model)
+  p_tree <- list()
+  p_mh <- list()
   
   for(m in models){
-    plot_data = plot_data_[which(plot_data_$Model == m), ]
+    plot_data <- plot_data_[which(plot_data_$Model == m), ]
     
     plot_data$Level[!plot_data$Level %in% tax_levels_] <- "Strain" # Rename contig_names to strain
     plot_data$Level <- factor(plot_data$Level, tax_levels_)
@@ -273,22 +277,22 @@ plot_manhattan_tree <- function(object, taxonomy, coef = 2) {
       var <- "Contig_name"
     }
     
-    idx_ord <- match(plot_data$Name[plot_data$Level == var], object@row_data@listData$Genome_file)
+    idx_ord <- match(plot_data$Name[plot_data$Level == var], getGenomes(object))
     if(m == "Zero-Inflated"){
-      p_vals_orig <- object@zi_p_values@listData[[coef]][idx_ord]
+      p_vals_orig <- getZIPValues(object)[[coef]][idx_ord]
     } else {
-      p_vals_orig <- object@p_values@listData[[coef]][idx_ord]
+      p_vals_orig <- getPValues(object)[[coef]][idx_ord]
     }
     
     
     dat_mhp <- data.frame(
-      Genome = object@row_data@listData$Genome_file[idx_ord],
+      Genome = getGenomes(object)[idx_ord],
       p_vals_orig = -log10(p_vals_orig)
     )
     
     ## let's ensure alphabetic ordering for Genome here
     # The tree can sometimes differ based on genome order
-    dat_mhp = dat_mhp[order(dat_mhp$Genome),]; rownames(dat_mhp) = NULL
+    dat_mhp <- dat_mhp[order(dat_mhp$Genome),]; rownames(dat_mhp) <- NULL
     
     tax_mhp <- taxonomy[match(dat_mhp$Genome, taxonomy$Genome), ]
     tax_mhp <- tax_mhp[order(tax_mhp$Domain), ]
@@ -352,15 +356,6 @@ plot_manhattan_tree <- function(object, taxonomy, coef = 2) {
   # Ensure both lists are same length
   stopifnot(length(p_mh) == length(p_tree))
   
-  # This one is fancy, but there is no point in plotting the tree twice!
-  # # Combine each Manhattan/tree pair vertically
-  # combined_pairs <- Map(function(mh, tree, title) {
-  #   mh <- mh + ggplot2::ggtitle(title)
-  #   mh / tree + patchwork::plot_layout(heights = c(4, 1))
-  # }, p_mh, p_tree, models)
-  
-  # Now lay them out side by side
-  # return(patchwork::wrap_plots(combined_pairs, nrow = 1))
   
   if(length(models) == 2) {
     return(p_mh[[1]] / p_mh[[2]] / p_tree[[1]] + patchwork::plot_layout(heights = c(4, 4, 1)))

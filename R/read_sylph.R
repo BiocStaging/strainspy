@@ -20,7 +20,7 @@
 #' leaving only the base file name. Defaults to `TRUE`.
 #'
 #' @return A SummarizedExperiment object with the following components:
-#'   \item{assays}{A matrix containing numeric features such as `Adjusted_ANI`, `Taxonomic_abundance`, `Median_cov`, etc.}
+#'   \item{assays}{A matrix of the selected `variable`, by default `Adjusted_ANI`.}
 #'   \item{rowData}{DataFrame containing metadata for each sequence, such as `Contig_name` and `Genome_file`.}
 #'   \item{colData}{DataFrame containing information for each sample (derived from the `Sample_file` field).}
 #'
@@ -81,8 +81,9 @@ read_sylph <- function(file_path, meta_data=NULL, variable = "Adjusted_ANI", min
   }
   
   if (!variable %in% valid_var) {
-    stop(paste0("The variable column '", variable, "' is not valid! Please choose from '",
-                paste(valid_var, collapse = "', '"), "'"))
+    valid_txt <- paste(valid_var, collapse = "', '")
+    stop("The variable column '", variable, "' is not valid! Please choose from '",
+         valid_txt, "'")
   }
   
   required_columns <- c("Sample_file", "Genome_file", "Contig_name", variable)
@@ -90,8 +91,8 @@ read_sylph <- function(file_path, meta_data=NULL, variable = "Adjusted_ANI", min
   # Validate that the data contains the expected columns
   missing_columns <- setdiff(required_columns, preview_col_names)
   if (length(missing_columns) > 0) {
-    stop(paste0("The following required columns are missing from the Sylph file: ",
-                paste(missing_columns, collapse = ", ")))
+    missing_txt <- paste(missing_columns, collapse = ", ")
+    stop("The following required columns are missing from the Sylph file: ", missing_txt)
   }
   
   # Read the Sylph output file
@@ -119,36 +120,10 @@ read_sylph <- function(file_path, meta_data=NULL, variable = "Adjusted_ANI", min
   n_rows <- max(sylph_data$row_indices)
   n_cols <- max(sylph_data$col_indices)
   
-  # Merge metadata if provided
-  # if (is.null(meta_data)){
   # Generate colData
   col_data <- S4Vectors::DataFrame(unique(sylph_data[, .(Sample_file, col_indices)][order(col_indices)]))
   rownames(col_data) <- col_data[,1]
   col_data[['col_indices']] <- NULL
-  # } else {
-  # col_data <- unique(sylph_data[, .(Sample_file, col_indices)][order(col_indices)])
-  # 
-  # # Extract unique sample names
-  # meta_samples <- unique(meta_data[[1]])
-  # 
-  # # Warn about mismatched samples
-  # if (length(missing_from_meta <- setdiff(col_data$Sample_file, meta_samples)) > 0) {
-  #   stop("The following samples from 'sylph_data' are not in 'meta_data': ", paste(missing_from_meta, collapse = ", "))
-  # }
-  # 
-  # if (length(missing_from_sylph <- setdiff(meta_samples, col_data$Sample_file)) > 0) {
-  #   stop("The following samples from 'meta_data' are not in 'sylph_data': ", paste(missing_from_sylph, collapse = ", "))
-  # }
-  # 
-  # col_data <- S4Vectors::DataFrame(base::merge(col_data, meta_data,
-  #                                              by.x = "Sample_file",
-  #                                              by.y = names(meta_data)[1],
-  #                                              all.x = TRUE)) # Keeps all Sample_file entries from sylph_data
-  # 
-  # 
-  # rownames(col_data) <- col_data[["Sample_file"]]
-  # col_data[['col_indices']] <- NULL
-  # }
   
   # Extract row metadata (rowData)
   # Generate row_data using unique combinations and indices
@@ -160,13 +135,13 @@ read_sylph <- function(file_path, meta_data=NULL, variable = "Adjusted_ANI", min
   
   # Deal with file names and extensions
   if (clean_names){
-    row_data$Genome_file <- tools::file_path_sans_ext(basename(row_data$Genome_file),
+    row_data$Genome_file <- file_path_sans_ext(basename(row_data$Genome_file),
                                                       compression = TRUE)
     row_data$Genome_file <- gsub("^.*(GC[A-Z]_\\d+\\.\\d+).*", "\\1", row_data$Genome_file)
     
-    col_data$Sample_file <- tools::file_path_sans_ext(basename(col_data$Sample_file),
+    col_data$Sample_file <- file_path_sans_ext(basename(col_data$Sample_file),
                                                       compression = TRUE)
-    rownames(col_data) <- tools::file_path_sans_ext(basename(rownames(col_data)),
+    rownames(col_data) <- file_path_sans_ext(basename(rownames(col_data)),
                                                     compression = TRUE)
   }
   
@@ -174,7 +149,7 @@ read_sylph <- function(file_path, meta_data=NULL, variable = "Adjusted_ANI", min
   check_unique_names(rownames(col_data), "sample", clean_names)
   check_unique_names(rownames(row_data), "feature", clean_names)
 
-  se = SummarizedExperiment::SummarizedExperiment(
+  se <- SummarizedExperiment::SummarizedExperiment(
     assays = list(Matrix::sparseMatrix(
       i = sylph_data[['row_indices']],
       j = sylph_data[['col_indices']],
@@ -208,7 +183,7 @@ read_sylph <- function(file_path, meta_data=NULL, variable = "Adjusted_ANI", min
 #' 
 #' @param sylph_files A character vector of sylph output file paths to merge.
 #' @param output Save path for the output file. Internally, data.table::fwrite is used, provide the extension `gz` to save a compressed file.
-#' @return Invisibly returns `NULL`. The merged sylph table is written to `output`.
+#' @return Invisibly returns `output`. The merged sylph table is written to that path.
 #' @examples
 #' # Split the bundled profile into two per-sample files, then merge them back.
 #' profile <- data.table::fread(
@@ -234,7 +209,8 @@ merge_sylph_files <- function(sylph_files, output) {
   
   if (!all(file.exists(sylph_files))) {
     missing <- sylph_files[!file.exists(sylph_files)]
-    stop("Sylph files not found: ", paste(missing, collapse = ", "))
+    missing_txt <- paste(missing, collapse = ", ")
+    stop("Sylph files not found: ", missing_txt)
   }
   
   open_input <- function(path) {

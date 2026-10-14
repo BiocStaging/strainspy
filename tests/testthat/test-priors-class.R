@@ -7,7 +7,7 @@ testthat::test_that("compute_eb_priors returns a valid strainspy_priors object",
   testthat::expect_s4_class(pri, "strainspy_priors")
   testthat::expect_true(methods::validObject(pri))
   testthat::expect_identical(pri@method, "empirical")
-  testthat::expect_s3_class(pri@priors_df, "data.frame")
+  testthat::expect_s3_class(getPriorsDf(pri), "data.frame")
 })
 
 testthat::test_that("strainspy_priors show and accessor methods run", {

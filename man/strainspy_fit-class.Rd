@@ -5,14 +5,14 @@
 \alias{strainspy_fit-class}
 \title{strainspy_fit: A Class for storing fit data from all strainspy models}
 \description{
-The \code{strainspy_fit} class is designed to store the results of strainspy
+The \code{strainspy_fit} class stores the results of a strainspy model fit.
 }
 \section{Slots}{
 
 \describe{
 \item{\code{row_data}}{A \code{DataFrame} containing row data.}
 
-\item{\code{priors}}{A \code{strainspy_priors} object or \code{NULL} for REML.}
+\item{\code{priors}}{A \code{strainspy_priors} object, or \code{NULL} for an unpenalised maximum-likelihood fit.}
 
 \item{\code{scale_continuous}}{A logical indicating whether all numeric columns were z-score standardized}
 
@@ -22,7 +22,7 @@ The \code{strainspy_fit} class is designed to store the results of strainspy
 
 \item{\code{p_values}}{A \code{DataFrame} containing p-values for the coefficients.}
 
-\item{\code{vcov}}{A \code{DataFrame} containing the variance-covariance matrix.}
+\item{\code{vcov}}{A \code{List} of per-feature variance-covariance matrices, or \code{NULL}.}
 
 \item{\code{zi_coefficients}}{A \code{DataFrame} containing zero-inflation coefficients.}
 
@@ -30,13 +30,13 @@ The \code{strainspy_fit} class is designed to store the results of strainspy
 
 \item{\code{zi_p_values}}{A \code{DataFrame} containing zero-inflation p-values.}
 
-\item{\code{zi_vcov}}{A \code{DataFrame} containing the zero-inflated variance-covariance matrix.}
+\item{\code{zi_vcov}}{A \code{List} of per-feature zero-inflation variance-covariance matrices, or \code{NULL}.}
 
 \item{\code{residuals}}{A \code{DataFrame} containing residuals from the model.}
 
 \item{\code{convergence}}{A logical indicating whether model fitting converged.}
 
-\item{\code{design}}{A matrix representing the design matrix of the model.}
+\item{\code{design}}{The model formula.}
 
 \item{\code{call}}{The matched call of the model.}
 

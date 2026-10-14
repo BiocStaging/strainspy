@@ -4,22 +4,21 @@
 #' ready for modeling with \pkg{caret}. The function extracts selected contigs
 #' from the `sy` assay matrix, combines them with the specified `outcome` and 
 #' optional `covariates` from the metadata, and performs basic validation
-#' and cleaning. Metadata is pulled from `SummarizedExperiement::colData(sy)`, 
+#' and cleaning. Metadata is pulled from `SummarizedExperiment::colData(sy)`, 
 #' and generally assumes `strainspy::modify_metadata()` was used upstream.
 #'
-#' @param sy A \link[SummarizedExperiment]{SummarizedExperiment} A 
-#' `SummarizedExperiment` object containing the assay data and metadata.
+#' @param sy A `SummarizedExperiment` object containing the assay data and metadata.
 #' @param outcome Character string giving the name of the outcome variable
 #'   present in \code{colData(sy)}. This is usually the left-hand side of the
 #'   prediction model formula.
-#' @param contigs Character vector of contigs (feature) to include as
+#' @param contigs Character vector of contigs (features) to include as
 #'   predictors. Must be present in \code{rownames(sy)}.
 #' @param covariates Optional character vector of additional metadata variables
 #'   to include as covariates. Default  `NULL` for no covariates.
 #' @param use_genome_names Bool. Use `Genome_file` instead of `Contig_name` in 
 #' `colnames(output)`. `Genome_file` is extracted from 
-#' `SummarizedExperiemnt::elementMetadata(sy)`. If not available, `Contig_name`
-#' will be used. Default `True`.
+#' `SummarizedExperiment::elementMetadata(sy)`. If not available, `Contig_name`
+#' will be used. Default `TRUE`.
 #'
 #' @details
 #' Character variables are automatically converted to factors.
@@ -61,10 +60,10 @@ prep_for_prediction <- function(sy, outcome, contigs, covariates = NULL, use_gen
   sy_mx <- t(as.matrix(sy_mx))
   
   if(use_genome_names){
-    contig_genomes = as.data.frame(SummarizedExperiment::elementMetadata(sy))
-    genomes = contig_genomes$Genome_file[match(colnames(sy_mx), contig_genomes$Contig_name)]
+    contig_genomes <- as.data.frame(SummarizedExperiment::elementMetadata(sy))
+    genomes <- contig_genomes$Genome_file[match(colnames(sy_mx), contig_genomes$Contig_name)]
     if(any(duplicated(genomes))) stop("Found duplicated genomes.")
-    colnames(sy_mx) = make.names(genomes)
+    colnames(sy_mx) <- make.names(genomes)
   }
   
   df <- data.frame(outcome = meta[[outcome]])
@@ -72,20 +71,22 @@ prep_for_prediction <- function(sy, outcome, contigs, covariates = NULL, use_gen
   
   if (!is.null(covariates)) {
     missing_cov <- setdiff(covariates, names(meta))
-    if (length(missing_cov) > 0)
-      stop("Missing covariates in metadata: ", paste(missing_cov, collapse = ", "))
+    if (length(missing_cov) > 0) {
+      missing_txt <- paste(missing_cov, collapse = ", ")
+      stop("Missing covariates in metadata: ", missing_txt)
+    }
     df <- cbind(df, meta[, covariates, drop = FALSE])
   }
   
   df <- cbind(df, as.data.frame(sy_mx))
 
-  char_cols <- sapply(df, is.character)
+  char_cols <- vapply(df, is.character, logical(1))
   if (any(char_cols)) {
     df[char_cols] <- lapply(df[char_cols], as.factor)
     message("Converted ", sum(char_cols), " character variable(s) to factors.")
   }
   
-  if (any(!is.finite(as.matrix(df[, sapply(df, is.numeric), drop = FALSE])))) {
+  if (any(!is.finite(as.matrix(df[, vapply(df, is.numeric, logical(1)), drop = FALSE])))) {
     warning("Detected Inf or NaN values in some of the numeric columns. Check before feeding to <CARET> or other prediction pipeline.")
   }
   

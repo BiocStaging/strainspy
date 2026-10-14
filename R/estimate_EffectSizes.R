@@ -5,7 +5,7 @@
 #' strain identity and are modeled on the logit scale. While this scale
 #' is effective for distinguishing phenotype groups statistically, the
 #' resulting effect sizes are not directly interpretable as differences
-#' in mean ANI. Same applies for effect sizes from the ordinal beta model.
+#' in mean ANI. The same applies to effect sizes from the ordinal beta model.
 #'
 #' This function converts logit-scale beta effects into response-scale
 #' mean ANI differences using marginal means and pairwise contrasts
@@ -18,9 +18,9 @@
 #' mean ANI difference against a preset threshold. A comment is added to each 
 #' hit depending on the outcome.
 #' 
-#' By default, this function uses the formula from `fit@design`. However, if the
+#' By default, this function uses the formula from `getDesign(fit)`. However, if the
 #' formula contains multiple covariates, this can cause emmeans to behave 
-#' unexpectedly. For example, if `fit@design = ~ disease + age + sex + country + (1|study)`,
+#' unexpectedly. For example, if `getDesign(fit)` is `~ disease + age + sex + country + (1|study)`,
 #' this can cause this function to throw errors or warnings.  Using a `simplified_formula = ~ disease`
 #' to override can be a useful approach.
 #'
@@ -30,27 +30,26 @@
 #' @param se SummarizedExperiment. A `SummarizedExperiment` object containing 
 #' assay data and metadata
 #' @param fit A fitted `strainspy_fit`model
-#' @param th `tibble` returned by `top_hits()`.
-#' @param simplified_formula A formula to use instead of `fit@design`, useful
+#' @param th The table returned by `top_hits()` (required).
+#' @param simplified_formula A formula to use instead of `getDesign(fit)`, useful
 #' when the original design was too complex and causes emmeans to fail during 
 #' ANI estimation (default NULL).
-#' @param beta_min_nz Minimum non-zero proportion per phenotype group required 
-#' to consider a beta hit is well supported. Hits driven by a proportion 
-#' of non zero values below this threshold at least in one phenotype group are 
-#' flagged `too few nonzero`. Default 0.1. Hits driven by less than or equal to 
-#' 3 observations will be flagged automatically `<3 nonzero`.
+#' @param beta_min_nz Minimum proportion of non-zero values per phenotype group for
+#' a beta hit to be considered well supported. Hits where that proportion falls below
+#' this threshold in at least one group are flagged `too few nonzero`. Default 0.1.
+#' Hits supported by 3 or fewer observations are always flagged `<3 nonzero`.
 #' @param beta_min_ani_diff Minimum absolute mean ANI difference required  for 
-#' a beta hit to be considered meaningful. Effect sizes small than this are 
-#' flagged: `small effect`. Default = 1.5e-3 corresponds to 0.15% delta ANI. 
+#' a beta hit to be considered meaningful. Effect sizes smaller than this are 
+#' flagged: `small effect`. Default = 1.5e-2, i.e. 1.5 percentage points of ANI. 
 #' @param nthreads Number of threads for parallel processing. Default `1`.
-#' @param reorder_hits Logical. Return `th` after reordering hits to priorities
-#' best supported ones. Default `FALSE`.
+#' @param reorder_hits Logical. Return `th` after reordering hits to prioritise
+#' the best-supported ones. Default `FALSE`.
 #' @param BPPARAM Optional BiocParallelParam object.
 #' @param progress Logical. If `TRUE` (default), progress bars and progress messages are printed. Set to `FALSE` to silence them.
 #'
-#' @return A `tibble` similar to `th`, with added columns giving details on:
+#' @return A `data.frame` similar to `th`, with added columns giving details on:
 #' Component (Beta, ZI or both), Mean ANI_Difference, Contrast, Non-Zero Counts 
-#' of contrast components, and a general `Comment` on each hit. The commetn will 
+#' of contrast components, and a general `Comment` on each hit. The comment will 
 #' be `NA` if the hit passes all posthoc tests.
 #' @examples
 #' if (requireNamespace("emmeans", quietly = TRUE)) {
@@ -68,7 +67,7 @@
 #' 
 #' @export
 #' @importFrom BiocParallel bplapply SnowParam SerialParam
-comp_ani_diff_and_posthoc_test = function(se, fit, th = NULL,
+comp_ani_diff_and_posthoc_test <- function(se, fit, th = NULL,
                                           simplified_formula = NULL,
                                           beta_min_nz = 0.1, 
                                           beta_min_ani_diff = 1.5e-2, 
@@ -77,27 +76,7 @@ comp_ani_diff_and_posthoc_test = function(se, fit, th = NULL,
   
   check_progress(progress)
   
-  required_pkgs <- c("emmeans")
-  missing_pkgs <- required_pkgs[!vapply(required_pkgs, requireNamespace, logical(1), quietly = TRUE)]
-  
-  if (length(missing_pkgs) > 0) {
-    stop(
-      "The following packages are required for empirical Bayes estimation but not installed: ",
-      paste(missing_pkgs, collapse = ", "), ".\n",
-      "Please install them with install.packages(c(", 
-      paste0('"', missing_pkgs, '"', collapse = ", "), "))."
-    )
-  }
-  # # Sanity checks - th cannot be null any more
-  # if (!is.null(th)) {
-  #   if (!is.null(phenotype_of_interest) || !is.null(top_hit_contigs)) {
-  #     stop("Provide either `th` OR (`phenotype_of_interest` and `top_hit_contigs`), not both.")
-  #   }
-  # } else {
-  #   if (is.null(phenotype_of_interest) || is.null(top_hit_contigs)) {
-  #     stop("Provide either `th` OR both `phenotype_of_interest` and `top_hit_contigs`.")
-  #   }
-  # }
+  require_suggested("emmeans", "post-hoc effect size estimation")
   
   # check thresholds
   if (!is.numeric(beta_min_nz) || beta_min_nz <= 0 || beta_min_nz >= 1)
@@ -112,59 +91,43 @@ comp_ani_diff_and_posthoc_test = function(se, fit, th = NULL,
   if (!inherits(fit, "strainspy_fit"))
     stop("`fit` must be a strainspy_fit object.")
   
-  if(is.null(fit@vcov))
+  if(is.null(getVcov(fit)))
     stop("`fit` must contain variance-covariance data.")
   
-  # After adding support to all, reset as needed
-  # if(!any(grepl("glmZiBFit", fit@call)))
-  # stop("strainspy_fit must be from a call to glmZiBFit()")
   
   
   # Annotate the top hits
-  th = annotate_effect(th = th, pval_thresh = attr(th, 'alpha'))
+  th <- annotate_effect(th = th, pval_thresh = attr(th, 'alpha'))
   
   if(!"beta" %in% th$component){ # no beta hits
     if(!"both" %in% th$component) {
-      stop("No identity difference hits found in the provided th:
-       Running `estimate_effect_sizes()` is not required.")
+      stop("No identity difference hits found in the provided th: ",
+           "running `comp_ani_diff_and_posthoc_test()` is not required.")
     }
   }
   
-  top_hit_contigs = th$Contig_name[th$component !="zi"]
+  top_hit_contigs <- th$Contig_name[th$component !="zi"]
   
   # Could be a wrong se are the contigs present?
   missing_contigs <- setdiff(top_hit_contigs, rownames(se))
   if (length(missing_contigs) > 0) {
-    stop("The following contigs are not present in `se`: ",
-         paste(missing_contigs, collapse = ", "))
+    missing_txt <- paste(missing_contigs, collapse = ", ")
+    stop("The following contigs are not present in `se`: ", missing_txt)
   } else {
-    coef_idx = match(top_hit_contigs, fit@row_data$Contig_name)
+    coef_idx <- match(top_hit_contigs, getContigNames(fit))
   }
   
   # pick col_data from se
   col_data <- SummarizedExperiment::colData(se)
   
   # stick with scaling done during the original fit
-  if (fit@scale_continuous){ 
-    for (col in names(col_data)) {
-      if (is.numeric(col_data[[col]])) {
-        col_data[[col]] <- scale(col_data[[col]])  # Scale numeric columns
-      }
-    }
+  if (isScaleContinuous(fit)){ 
+    col_data <- scale_numeric_columns(col_data)
   }
   
   
   # Set up parallel infrastructure
-  if ((nthreads > 1) & (.Platform$OS.type != "windows")) {
-    # Check the operating system and set the backend accordingly
-    if (is.null(BPPARAM)) {
-      BPPARAM <- BiocParallel::SnowParam(workers = nthreads, progressbar = progress, tasks=length(top_hit_contigs))
-    } else if (!progress) {
-      BiocParallel::bpprogressbar(BPPARAM) <- FALSE
-    }
-  } else {
-    BPPARAM <- BiocParallel::SerialParam(progressbar = progress)
-  }
+  BPPARAM <- setup_bpparam(nthreads, BPPARAM, progress, tasks = length(top_hit_contigs))
   
   
   op_list <- BiocParallel::bplapply(
@@ -182,7 +145,7 @@ comp_ani_diff_and_posthoc_test = function(se, fit, th = NULL,
   
   op <- dplyr::left_join(th, op, by = "Contig_name")
   
-  op = posthoc_test(op, beta_min_nz, beta_min_ani_diff)
+  op <- posthoc_test(op, beta_min_nz, beta_min_ani_diff)
   
   if(reorder_hits){
     # Sort the hits in a more helpful way? Mixing beta + Zi is a bit of a headache
@@ -227,17 +190,17 @@ process_contig <- function(
     pheno
 ) {
   
-  beta1  <- unlist(fit@coefficients[i,])
+  beta1  <- unlist(getCoefficients(fit)[i,])
   # Intercept name is sometimes off (?bug)
   names(beta1) <- sub(".*[Ii]ntercept.*", "(Intercept)", names(beta1))
-  lvls = c("(Intercept)", names(beta1)[pheno])
-  beta1 = beta1[lvls]
+  lvls <- c("(Intercept)", names(beta1)[pheno])
+  beta1 <- beta1[lvls]
   
   if(is.null(form)){
-    combined_formula = as.formula(paste(c("Value", as.character(fit@design)),
+    combined_formula <- as.formula(paste(c("Value", as.character(getDesign(fit))),
                                                         collapse = " "))
   } else{
-    combined_formula = as.formula(paste(c("Value", as.character(form)),
+    combined_formula <- as.formula(paste(c("Value", as.character(form)),
                                         collapse = " "))
   }
   
@@ -245,10 +208,10 @@ process_contig <- function(
   
   formula1 <- nobars_(combined_formula)
   
-  V1 <- fit@vcov[[i]][lvls, lvls]
+  V1 <- getVcov(fit)[[i]][lvls, lvls]
   
-  cd = col_data
-  cd$Value = offset_ANI(
+  cd <- col_data
+  cd$Value <- offset_ANI(
     as.vector(SummarizedExperiment::assay(se)[i, ]) / 100
   )
   cd_df <- as.data.frame(cd)
@@ -256,20 +219,20 @@ process_contig <- function(
   # subset columns to only contain variables in formula
   mf1    <- cd_df[, all.vars(combined_formula)]
   # subset to only keep relavant rows
-  mdlmx = model.matrix(formula1, cd_df)
+  mdlmx <- model.matrix(formula1, cd_df)
   
-  ref_rows = which(mdlmx[, "(Intercept)"] == 1 & mdlmx[,lvls[2]] == 0)
-  comp_rows = which(mdlmx[, lvls[2]] == 1)
+  ref_rows <- which(mdlmx[, "(Intercept)"] == 1 & mdlmx[,lvls[2]] == 0)
+  comp_rows <- which(mdlmx[, lvls[2]] == 1)
   
   # find out support
-  s1 = quickly_find_support(ref_rows, cd_df)
-  s2 = quickly_find_support(comp_rows, cd_df)
+  s1 <- quickly_find_support(ref_rows, cd_df)
+  s2 <- quickly_find_support(comp_rows, cd_df)
   
   picked_rows <- sort(c(ref_rows, comp_rows))
   
-  mf1 = mf1[picked_rows, ]
+  mf1 <- mf1[picked_rows, ]
   
-  mf1 = remove_bad_rows(mf1) # qdrg doesn't like bad rows, remove them and warn!
+  mf1 <- remove_bad_rows(mf1) # qdrg doesn't like bad rows, remove them and warn!
   
   rg <- emmeans::qdrg(
     formula = formula1,
@@ -277,16 +240,16 @@ process_contig <- function(
     coef = beta1,
     vcov = V1,
     df = Inf,
-    family = fit@family
+    family = getFamily(fit)
   )
   
-  emm1 = emmeans::emmeans(rg, rg@model.info$terms)
-  res = data.frame(emmeans::contrast(emm1, method = "trt.vs.ctrl"))
-  pck_row = which(!is.nan(res$p.value))
+  emm1 <- emmeans::emmeans(rg, stats::delete.response(stats::terms(formula1)))
+  res <- data.frame(emmeans::contrast(emm1, method = "trt.vs.ctrl"))
+  pck_row <- which(!is.nan(res$p.value))
   
   if(length(pck_row) > 1){
     if(length(unique(res$p.value[pck_row]))){
-      pck_row = pck_row[1] # If there are multiple rows (happens when several covariates are present)
+      pck_row <- pck_row[1] # If there are multiple rows (happens when several covariates are present)
     }
   }
   
@@ -304,7 +267,6 @@ quickly_find_support <- function(rows, data) {
   vals <- data$Value[rows]
   c(
     nonzero = sum(vals != 0),
-    # zero    = sum(vals == 0),
     total   = length(vals)
   )
 }
@@ -314,7 +276,7 @@ remove_bad_rows <- function(df) {
   
   # Identify rows with NA, NULL, or Inf
   bad_rows <- apply(df, 1, function(row) {
-    any(is.na(row) | is.infinite(row) | sapply(row, is.null))
+    any(is.na(row) | is.infinite(row) | vapply(row, is.null, logical(1)))
   })
   
   n_removed <- sum(bad_rows)

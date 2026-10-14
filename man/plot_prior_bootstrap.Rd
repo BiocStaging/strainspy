@@ -3,7 +3,7 @@
 \name{plot_prior_bootstrap}
 \alias{plot_prior_bootstrap}
 \alias{plot_prior_bootstrap,strainspy_priors-method}
-\title{Plot method for strainspy_priors objects}
+\title{Plot the bootstrap distributions behind a strainspy_priors object}
 \usage{
 plot_prior_bootstrap(object, prior)
 
@@ -12,13 +12,13 @@ plot_prior_bootstrap(object, prior)
 \arguments{
 \item{object}{An object of class \code{strainspy_priors} that has bootstrap information}
 
-\item{prior}{Prior to be plotted}
+\item{prior}{Name of the coefficient whose bootstrap SD to plot, or "dispersion".}
 }
 \value{
-Invisibly returns the object
+A \code{patchwork} of \code{ggplot2} histograms.
 }
 \description{
-Plot method for strainspy_priors objects
+Plot the bootstrap distributions behind a strainspy_priors object
 }
 \examples{
 methods::hasMethod("plot_prior_bootstrap", "strainspy_priors")

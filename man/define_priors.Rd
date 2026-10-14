@@ -13,14 +13,14 @@ define_priors(
 )
 }
 \arguments{
-\item{se}{A \code{SummarizedExperiment} object with count matrix and colData.}
+\item{se}{A \code{SummarizedExperiment} object with the assay matrix and colData.}
 
 \item{design}{A fixed-effects-only formula (e.g., ~ group + age + sex).}
 
 \item{method}{Prior type ("preset_weak", "preset_strong", "manual"). To compute
 empirical priors, use \code{compute_eb_priors()}. Default \code{preset_weak}.}
 
-\item{add_dispersion_prior}{Add a prior of normal(0,1) to the dispersion parameter. Default False}
+\item{add_dispersion_prior}{Add a prior of normal(0,1) to the dispersion parameter. Default \code{FALSE}}
 
 \item{priors_df}{NULL if \code{method == 'preset_weak' | 'preset_strong'}, else a
 data.frame of priors suitable for glmmTMB model fitting. See \code{?glmmTMB::priors}

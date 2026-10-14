@@ -19,11 +19,11 @@ plot_ani_dist(
 \arguments{
 \item{se}{SummarizedExperiment. A \code{SummarizedExperiment} object containing the assay data and metadata.}
 
-\item{phenotype}{Any factor variable in \code{colnames(se@colData)}.}
+\item{phenotype}{Any factor variable in \code{colnames(colData(se))}.}
 
 \item{contigs}{A vector of contigs to generate distribution plots}
 
-\item{facet_phenotype}{Any factor variable in \code{colnames(se@colData)}, except \code{phenotype}. If provided, this will be used to facet the plot. See \code{?ggplot2::facet_wrap()}. Default NULL.}
+\item{facet_phenotype}{Any factor variable in \code{colnames(colData(se))}, except \code{phenotype}. If provided, this will be used to facet the plot. See \code{?ggplot2::facet_wrap()}. Default NULL.}
 
 \item{contig_names}{Optional character vector to replace long contig names in the plot.
 Must match the length and order of \code{contigs}. If NULL (default), shortening will be attempted automatically.}

@@ -2,7 +2,7 @@
 #'
 #' This function estimates sample-level **species richness** and 
 #' **strain coverage** using ANI-based presence/absence. A strain is 
-#' considered present if `ANI > ani_threshold`.
+#' considered present if `ANI >= ani_threshold`.
 #'
 #' Species richness is defined as the number of species with at least
 #' one strain exceeding the ANI threshold. This requires taxonomy data, which 
@@ -11,7 +11,7 @@
 #' **Experimental** Strain coverage is a database-dependent, normalised score 
 #' that increases with the number of reference strains detected within a species. 
 #' When only one strain is present for a species, it contributes 1 towards 
-#' strain coverage. Asmore strains are detected, the contribution increases 
+#' strain coverage. As more strains are detected, the contribution increases 
 #' toward 2, reaching 2 when all reference strains are detected. Although this 
 #' is designed to prevent inflation for species with many reference strains, 
 #' this measures the **coverage of reference strain space in the database**, 
@@ -19,9 +19,9 @@
 #' default.
 #'
 #' @param se SummarizedExperiment. A `SummarizedExperiment` object containing the assay data and metadata.
-#' @param taxonomy An optional taxonomy file read using `strainspy::read_taxonomy()`.
+#' @param taxonomy A taxonomy table read using `strainspy::read_taxonomy()` (required).
 #' @param ani_threshold Numeric ANI threshold used to define presence (default: 95).
-#' @param report_strain_richness Return the estimated strain_richness count. See description (default: FALSE)
+#' @param report_strain_richness Logical. Also return the strain coverage count. See description (default: FALSE)
 #'
 #' @return A named list with:
 #' \describe{
@@ -49,18 +49,18 @@
 #' rich <- estimate_sample_richness(se[1:20, ], tax)
 #' 
 #' @export
-estimate_sample_richness = function(se, taxonomy, ani_threshold=95, report_strain_richness = FALSE){
+estimate_sample_richness <- function(se, taxonomy, ani_threshold=95, report_strain_richness = FALSE){
   
   # Get the species level data
-  tax_sp = add_tax2tophits(data.frame(Genome_file = se@elementMetadata$Genome_file), taxonomy, columns = "Species")
+  tax_sp <- add_tax2tophits(data.frame(Genome_file = SummarizedExperiment::rowData(se)$Genome_file), taxonomy, columns = "Species")
   
   
-  asy = SummarizedExperiment::assay(se)
+  asy <- SummarizedExperiment::assay(se)
   species_list <- unique(tax_sp$Species)
   
   present <- Matrix::drop0( (asy >= ani_threshold)*1)  # Essentially a presence/absence representation
   sp_counts <- rowsum(present, group = tax_sp$Species)
-  sp_richness = colSums(sp_counts>0)
+  sp_richness <- colSums(sp_counts>0)
   
   # Can we do a strain aware approach - measure how much of the strains in the database are covered, but penalise for species with many strains
   if(report_strain_richness){
@@ -81,11 +81,15 @@ estimate_sample_richness = function(se, taxonomy, ani_threshold=95, report_strai
 
 #' Estimate beta diversity from ANI
 #'
+#' Computes between-sample distances from the ANI matrix and, unless `distance_only = TRUE`,
+#' runs NMDS, PERMANOVA and a beta-dispersion test grouped by `phenotype`. The `vegan`
+#' package is required for `method = "jaccard"` and for everything beyond the distance matrix.
+#'
 #' @param se SummarizedExperiment. A `SummarizedExperiment` object containing the assay data and metadata.
 #' @param method Distance method: \code{"manhattan"} (default) or \code{"jaccard"}
 #' @param distance_only Logical. If TRUE, stop after computing distance matrix
 #' @param ani_threshold Numeric. Threshold for presence/absence determination if \code{method == jaccard} (default 95)
-#' @param phenotype Any factor variable in `colnames(se@colData)`. Not required if \code{distance_only == FALSE}
+#' @param phenotype Any factor variable in `colnames(colData(se))`. Required unless \code{distance_only = TRUE}
 #' @param show_plots Logical. If TRUE, shows the plots (default = FALSE)
 #' @param return_plots Logical. If TRUE, returns ggplot2 objects (default = FALSE)
 #' 
@@ -129,9 +133,7 @@ estimate_beta_diversity <- function(
   }
   
   if(!distance_only | method == "jaccard"){
-    if (!requireNamespace("vegan", quietly = TRUE)) {
-      stop("The 'vegan' package is required but is not installed.")
-    }
+    require_suggested("vegan", "beta diversity estimation")
   }
   
   # Extract assay
@@ -200,14 +202,14 @@ estimate_beta_diversity <- function(
   if(show_plots){
     # NMDS
     invisible(readline("Press [Enter] to start visualising plots..."))
-    print(plots[[1]])
+    plot(plots[[1]])
     
     invisible(readline(
       "\nDisplaying plot: NMDS\nPress [Enter] to continue..."
     ))
     
     # Beta-dispersion ordination
-    print(plots[[2]])
+    plot(plots[[2]])
     invisible(readline(
       "\nDisplaying plot: Beta-dispersion ordination\nPress [Enter] to continue..."
     ))
@@ -217,7 +219,7 @@ estimate_beta_diversity <- function(
     message("\nDisplaying plot: Beta-dispersion boxplot\nPress [Enter] to continue...")
   }
   
-  if(!return_plots) plots = NULL # no one would do this?
+  if(!return_plots) plots <- NULL # no one would do this?
   
   
   return(list(

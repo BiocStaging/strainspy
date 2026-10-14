@@ -28,7 +28,7 @@ testthat::test_that("filter_by_presence enforces argument checks and reduces row
 
 	testthat::expect_error(
 		strainspy::filter_by_presence(d$se, min_nonzero = 1.5),
-		"`min_zero` must be an integer"
+		"`min_nonzero` must be an integer"
 	)
 
 	filtered <- strainspy::filter_by_presence(d$se, min_nonzero = 50)
@@ -50,4 +50,21 @@ testthat::test_that("extract_strainspy returns expected long format columns", {
 	testthat::expect_s3_class(out, "data.frame")
 	testthat::expect_true(all(c("sample", "Case_status", "Age_at_collection", "Contig_name", "ANI") %in% colnames(out)))
 	testthat::expect_true(all(unique(out$Contig_name) %in% contigs))
+})
+testthat::test_that("extract_strainspy validates the taxonomy before joining", {
+	d <- ss_test_data()
+	contigs <- rownames(d$se_filtered)[1:2]
+
+	testthat::expect_error(
+		strainspy::extract_strainspy(d$se_filtered, "Case_status", contigs, taxonomy = "taxonomy.tsv"),
+		"must be a data.frame"
+	)
+	testthat::expect_error(
+		strainspy::extract_strainspy(d$se_filtered, "Case_status", contigs, taxonomy = data.frame(x = 1)),
+		"Column 'Genome' not found"
+	)
+	testthat::expect_error(
+		strainspy::extract_strainspy(d$se_filtered, "Case_status", c(contigs, "no_such_contig")),
+		"Contigs missing"
+	)
 })

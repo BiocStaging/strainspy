@@ -12,7 +12,7 @@ merge_sylph_files(sylph_files, output)
 \item{output}{Save path for the output file. Internally, data.table::fwrite is used, provide the extension \code{gz} to save a compressed file.}
 }
 \value{
-Invisibly returns \code{NULL}. The merged sylph table is written to \code{output}.
+Invisibly returns \code{output}. The merged sylph table is written to that path.
 }
 \description{
 Merge the outputs of \verb{sylph query} or \verb{sylph profile} into a single file.

@@ -7,18 +7,18 @@
 #' @param design Formula. A formula to specify the fixed and random effects, e.g., `Outcome ~ Value + Covariate + (1|Sample)`.
 #' @param min_identity A numeric value specifying the minimum identity threshold to consider (default=0.98).
 #' @param nthreads An integer specifying the number of (CPUs or workers) to use. Defaults
-#'        to one 1.
-#' @param scale_continuous Logical. If `TRUE`, all numeric columns in `colData(se)` are z-score standardized (mean = 0, SD = 1). Defaults to `FALSE`.
+#'        to 1.
+#' @param scale_continuous Logical. If `TRUE`, all numeric columns in `colData(se)` are z-score standardized (mean = 0, SD = 1). Defaults to `TRUE`.
 #' @param BPPARAM Optional `BiocParallelParam` object. If not provided, the function
 #'        will configure an appropriate backend automatically.
 #' @param progress Logical. If `TRUE` (default), progress bars and progress messages are printed. Set to `FALSE` to silence them.
 #'
 #' @return A `strainspy_fit` object with the following components:
-#' \item{row_data}{A DFrame with 6 slots with feature details}
+#' \item{row_data}{The `rowData` of `se` for the fitted features}
 #' \item{coefficients}{A DFrame with coefficients for each feature}
 #' \item{std_errors}{A DFrame of standard errors for each feature}
 #' \item{p_values}{A DFrame of p-values for each feature}
-#' \item{residuals}{A DFrame of residual vectors for each feature}
+#' \item{residuals}{`NULL`; residuals are not stored by this fitter}
 #' \item{convergence}{A named logical vector indicating convergence for each feature}
 #' \item{design}{Formula used in the call to `caseControlFit`}
 #' \item{call}{Call to `caseControlFit`} 
@@ -57,14 +57,10 @@ caseControlFit <- function(se, design, min_identity=0.98, nthreads=1, scale_cont
     stop("`design` must contain the term Value on the RHS, e.g. `Outcome ~ Value + Covariate + (1|Sample)`")
   }
 
-  # colData (sample metadata)
+  # Sample metadata from colData
   col_data <- SummarizedExperiment::colData(se)
   if (scale_continuous==TRUE){
-    for (col in names(col_data)) {
-      if (is.numeric(col_data[[col]])) {
-        col_data[[col]] <- scale(col_data[[col]])  # Scale numeric columns
-      }
-    }
+    col_data <- scale_numeric_columns(col_data)
   }
 
   # Ensure the design is a formula
@@ -80,10 +76,7 @@ caseControlFit <- function(se, design, min_identity=0.98, nthreads=1, scale_cont
   # Define priors
   col_data$Value <- 1 # dummy variable for the response
   
-  nbd = nobars_(design)
-  if(is.null(nbd)){
-    stop(paste(paste(design, collapse = ''), "--- is not a valid formula."))
-  } 
+  nbd <- check_design_formula(design)
   nbeta <- ncol(model.matrix(nbd, col_data))
   
   fixed_priors <- data.frame(
@@ -92,20 +85,7 @@ caseControlFit <- function(se, design, min_identity=0.98, nthreads=1, scale_cont
     coef  = as.character(seq(1,nbeta)))
 
   # Set up parallel infrastructure
-  if ((nthreads > 1) & (.Platform$OS.type != "windows")) {
-    # Check the operating system and set the backend accordingly
-    if (is.null(BPPARAM)) {
-      # Use MulticoreParam for Unix-like systems
-      # BPPARAM <- BiocParallel::MulticoreParam(
-      #   workers = nthreads
-      # )
-      BPPARAM <- BiocParallel::SnowParam(workers = nthreads, progressbar = progress, tasks=100)
-    } else if (!progress) {
-      BiocParallel::bpprogressbar(BPPARAM) <- FALSE
-    }
-  } else {
-    BPPARAM <- BiocParallel::SerialParam(progressbar = progress)
-  }
+  BPPARAM <- setup_bpparam(nthreads, BPPARAM, progress, tasks = 100)
 
   # Split rows into 50-row chunks
   row_chunks <- split(
@@ -137,6 +117,7 @@ caseControlFit <- function(se, design, min_identity=0.98, nthreads=1, scale_cont
                    zi_p_values = NULL,
                    residuals = NULL,
                    convergence = purrr::map_lgl(results, ~ .x$convergence),
+                   scale_continuous = scale_continuous,
                    design = design,
                    call = match.call()  # Store the function call for reproducibility
   )
@@ -157,6 +138,7 @@ caseControlFit <- function(se, design, min_identity=0.98, nthreads=1, scale_cont
 #' @param min_identity A numeric value specifying the minimum identity threshold to consider (default=0.98).
 #' @return A list with model coefficients, zero-inflation coefficients, residuals,
 #'         log-likelihood, and convergence status.
+#' @noRd
 fit_logit_model <- function(se_subset, col_data, design, fixed_priors, min_identity) {
 
   chunk_results <- lapply(seq_len(nrow(se_subset)), function(row_index){

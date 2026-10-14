@@ -13,7 +13,7 @@
 A list summarizing the \code{strainspy_fit} object.
 }
 \description{
-Provides a high-level summary of a \code{strainspy_fit} object, including its call,
-coefficients, zero-inflation coefficients, dispersion, and the availability
-of FDR and residuals.
+Provides a high-level summary of a \code{strainspy_fit} object: its call, the first
+rows of the coefficients and zero-inflation coefficients, and whether residuals
+are available.
 }

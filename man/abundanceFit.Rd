@@ -19,7 +19,7 @@ abundanceFit(
 
 \item{design}{Formula. A formula to specify the fixed and random effects, e.g., \code{ ~ Group + (1|Sample)}.}
 
-\item{nthreads}{An integer specifying the number of (CPUs or workers) to use. Defaults to one 1.}
+\item{nthreads}{An integer specifying the number of (CPUs or workers) to use. Defaults to 1.}
 
 \item{scale_continuous}{Logical. If \code{TRUE}, all numeric columns in \code{colData(se)} are z-score standardized (mean = 0, SD = 1). Defaults to \code{TRUE}.}
 
@@ -31,7 +31,7 @@ abundanceFit(
 }
 \value{
 A \code{strainspy_fit} object with the following components:
-\item{row_data}{A DFrame with 6 slots with feature details}
+\item{row_data}{The \code{rowData} of \code{se} for the fitted features}
 \item{coefficients}{A DFrame with coefficients for each feature}
 \item{std_errors}{A DFrame of standard errors for each feature}
 \item{p_values}{A DFrame of p-values for each feature}

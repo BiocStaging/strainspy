@@ -23,6 +23,9 @@ MIT](https://img.shields.io/badge/license-MIT-blue.svg)](https://opensource.org/
 
 ## Installation
 
+StrainSpy will be available via BioConductor soon. In the meantime, you
+can install the latest version from R-universe:
+
 ``` r
 install.packages("BiocManager")
 install.packages("strainspy", repos = c("https://sudaraka88.r-universe.dev", BiocManager::repositories()))
@@ -38,7 +41,7 @@ options](#alternative-installation-options).
 
 This quick start demonstrates a typical `StrainSpy` analysis and
 showcases some of the models and outputs available. Here, we analyse a
-200 sample subset of the data described in [Wallen *et al.*
+200-sample subset of the data described in [Wallen *et al.*
 2022](https://doi.org/10.1038/s41467-022-34667-x).
 
 ``` r
@@ -100,25 +103,36 @@ knitr::kable(th)
 | NZ_WSNW01000023.1 Coprobacillus cateniformis strain RCA1-24 10234_10235, whole genome shotgun sequence | GCF_009767585.1 | 0.1667314 | 0.1243133 | 0.1798493 | 1.0000000 | -1.8172219 | 0.4454086 | 0.0000451 | 0.0212661 |
 | UREB01000001.1 uncultured Clostridiales bacterium isolate UMGS913 genome assembly, contig: NODE_380_length_41473_cov_4.232942, whole genome shotgun sequence | GCA_900546685.1 | 0.2481419 | 0.0638069 | 0.0001007 | 0.0475203 | -0.3495862 | 0.2874739 | 0.2239611 | 1.0000000 |
 
-*Coprobacillus cateniformis* shows difference in presence (adjusted p =
-0.0213). *Clostridiales bacterium* shows difference in identity
-(adjusted p \< 0.01).
+*Coprobacillus cateniformis* shows a difference in presence (adjusted p
+= 0.0213). *Clostridiales bacterium* shows a difference in identity
+(adjusted p = 0.048).
 
 ### Perform post-hoc testing to validate the beta hit
 
 ``` r
 th = comp_ani_diff_and_posthoc_test(se, fit, th, progress = FALSE)
 
-# This NA indicates posthoc testing does not invalidate this beta hit
+knitr::kable(th)
+```
+
+| Contig_name | Genome_file | coefficient | std_error | p_value | p_adjust | zi_coefficient | zi_std_error | zi_p_value | zi_p_adjust | hit_component | ANI_Difference | contrast | ref_nz_obs | ref_tot_obs | comp_nz_obs | comp_tot_obs | Comment |
+|:---|:---|---:|---:|---:|---:|---:|---:|---:|---:|:---|---:|:---|---:|---:|---:|---:|:---|
+| NZ_WSNW01000023.1 Coprobacillus cateniformis strain RCA1-24 10234_10235, whole genome shotgun sequence | GCF_009767585.1 | 0.1667314 | 0.1243133 | 0.1798493 | 1.0000000 | -1.8172219 | 0.4454086 | 0.0000451 | 0.0212661 | zi | NA | NA | NA | NA | NA | NA | NA |
+| UREB01000001.1 uncultured Clostridiales bacterium isolate UMGS913 genome assembly, contig: NODE_380_length_41473_cov_4.232942, whole genome shotgun sequence | GCA_900546685.1 | 0.2481419 | 0.0638069 | 0.0001007 | 0.0475203 | -0.3495862 | 0.2874739 | 0.2239611 | 1.0000000 | beta | 0.2481419 | (PD Age_at_collection-7.69384556065233e-16) - (Control Age_at_collection-7.69384556065233e-16) | 46 | 100 | 55 | 100 | NA |
+
+``` r
+
+# Comment = NA indicates posthoc testing does not invalidate this beta hit
 is.na(th$Comment)
 #> [1] TRUE TRUE
 
-th$ANI_Difference
-#> [1]        NA 0.2481419
+# Average difference in ANI value
+th$ANI_Difference[2]
+#> [1] 0.2481419
 ```
 
 In *Clostridiales bacterium*, average ANI (green dashed line) is 0.25%
-lower in Controls compared to Parkinson Disease (PD). The distribution
+lower in Controls compared to Parkinson’s disease (PD). The distribution
 appears different between groups.
 
 ## Visualise the distribution of top hits with Case_status
@@ -186,7 +200,7 @@ divs$plots$NMDS
 ``` r
 example_sourmash_path <- system.file("extdata", "example_sourmash.csv.gz", package = "strainspy")
 sm <- read_sourmash(example_sourmash_path, meta_data)
-print(sm)
+show(sm)
 #> class: SummarizedExperiment 
 #> dim: 1508 20 
 #> metadata(0):
@@ -215,7 +229,7 @@ print(sm)
 example_metaphlan_path <- system.file("extdata", "metaphlan_merged.tsv.gz", package = "strainspy")
 example_taxonomy_path <- system.file("extdata", "metaphlan_taxonomy.tsv.gz", package = "strainspy")
 mp <- read_metaphlan(example_metaphlan_path, meta_data)
-print(mp)
+show(mp)
 #> class: SummarizedExperiment 
 #> dim: 1831 200 
 #> metadata(0):
@@ -290,18 +304,17 @@ outputs to a single tsv file ready for `StrainSpy`.
 
 ### Taxonomy data
 
-Relevant taxonomy `tsv` files for each database is available for
+Relevant taxonomy `tsv` files for each database are available for
 download at [Zenodo](https://zenodo.org/records/21796878).
 
 ### Metadata
 
-A metadata `tsv` file (optionally `gz` compressed) needs to be prepared
-for each dataset before analysis. Each sample should be in a single row,
-and each column should contain a metadata variable. The first column
-should be named `run_accession` and contain the unique sample
-identifiers that exactly match the Sylph output file. See the example
-files provided with the package for guidance, available at
-`inst/extdata/`.
+A metadata `csv` or `tsv` file (optionally `gz` compressed) needs to be
+prepared for each dataset before analysis. Each sample should be in a
+single row, and each column should contain a metadata variable. The
+first column must contain the unique sample identifiers that exactly
+match the Sylph output file. See the example files provided with the
+package for guidance, available at `inst/extdata/`.
 
 ## Alternative installation options
 
@@ -326,6 +339,20 @@ conda activate strainspy
 See the [Bioconda recipe
 page](http://bioconda.github.io/recipes/r-strainspy/README.html) for
 more information.
+
+### Container
+
+A container image is also available via bioconda, hosted on
+[quay.io](https://quay.io/repository/biocontainers/r-strainspy?tab=tags).
+You can use it with your favourite container runtime, e.g., Docker,
+Podman, or Apptainer/Singularity.
+
+**Example with Apptainer**
+
+``` bash
+apptainer pull docker://quay.io/biocontainers/r-strainspy:0.99.1--r45hdfd78af_0
+apptainer exec r-strainspy_0.99.1--r45hdfd78af_0.sif R
+```
 
 ### Github Version
 

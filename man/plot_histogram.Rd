@@ -19,15 +19,15 @@ plot_histogram(
 \arguments{
 \item{se}{SummarizedExperiment. A \code{SummarizedExperiment} object containing the assay data and metadata.}
 
-\item{phenotype}{One variable in \code{colnames(se@colData)}, except \code{Sample_File}. The selected variable must be categorical}
+\item{phenotype}{One variable in \code{colnames(colData(se))}, except \code{Sample_file}. The selected variable must be categorical}
 
 \item{contig}{Contig name to visualise}
 
 \item{bins}{Numeric. Number of bins to plot the histogram. This parameter should be adjusted to properly visualise the ANI differences. Default 250}
 
-\item{drop_zeros}{Bool. If TRUE, ANI or Abundance 0 values will not be included in the violin plot. Default FALSE}
+\item{drop_zeros}{Bool. If TRUE, ANI or Abundance 0 values will not be included in the histogram. Default FALSE}
 
-\item{show_quantiles}{Bool. If TRUE, min, max, etc. will be shown as vertical lines. Default TRUE}
+\item{show_quantiles}{Bool. If TRUE, the minimum, first quartile, median, mean, third quartile and maximum are shown as vertical lines. Default TRUE}
 
 \item{fit_spline}{Bool. If TRUE, a spline will be fitted to each histogram. Default FALSE}
 

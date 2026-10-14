@@ -6,26 +6,26 @@ setClassUnion("ListOrNULL", c("List", "NULL"))
 
 #' strainspy_fit: A Class for storing fit data from all strainspy models
 #'
-#' The `strainspy_fit` class is designed to store the results of strainspy
+#' The `strainspy_fit` class stores the results of a strainspy model fit.
 #' 
 #' @importClassesFrom S4Vectors DataFrame List
 #' @importMethodsFrom S4Vectors show
 #'
 #'
 #' @slot row_data A `DataFrame` containing row data.
-#' @slot priors A `strainspy_priors` object or `NULL` for REML.
+#' @slot priors A `strainspy_priors` object, or `NULL` for an unpenalised maximum-likelihood fit.
 #' @slot scale_continuous A logical indicating whether all numeric columns were z-score standardized
 #' @slot coefficients A `DataFrame` containing model coefficients.
 #' @slot std_errors A `DataFrame` containing standard errors of the coefficients.
 #' @slot p_values A `DataFrame` containing p-values for the coefficients.
-#' @slot vcov A `DataFrame` containing the variance-covariance matrix.
+#' @slot vcov A `List` of per-feature variance-covariance matrices, or `NULL`.
 #' @slot zi_coefficients A `DataFrame` containing zero-inflation coefficients.
 #' @slot zi_std_errors A `DataFrame` containing zero-inflation standard errors.
 #' @slot zi_p_values A `DataFrame` containing zero-inflation p-values.
-#' @slot zi_vcov A `DataFrame` containing the zero-inflated variance-covariance matrix.
+#' @slot zi_vcov A `List` of per-feature zero-inflation variance-covariance matrices, or `NULL`.
 #' @slot residuals A `DataFrame` containing residuals from the model.
 #' @slot convergence A logical indicating whether model fitting converged.
-#' @slot design A matrix representing the design matrix of the model.
+#' @slot design The model formula.
 #' @slot call The matched call of the model.
 #' @slot family The family of the fit. 
 #'
@@ -121,7 +121,7 @@ methods::setMethod("show", "strainspy_fit", function(object) {
     cat("Priors used:\n")
     show(object@priors)
   } else {
-    cat("Fitted using REML.\n")
+    cat("Fitted without MAP priors (maximum likelihood).\n")
   }
   
   cat(rep("-", 30), "\n", sep = "")
@@ -177,9 +177,9 @@ methods::setMethod("getResiduals", "strainspy_fit", function(object) {
 
 #' Summary Method for strainspy_fit
 #'
-#' Provides a high-level summary of a `strainspy_fit` object, including its call,
-#' coefficients, zero-inflation coefficients, dispersion, and the availability
-#' of FDR and residuals.
+#' Provides a high-level summary of a `strainspy_fit` object: its call, the first
+#' rows of the coefficients and zero-inflation coefficients, and whether residuals
+#' are available.
 #'
 #' @param object An object of class `strainspy_fit`.
 #' @return A list summarizing the `strainspy_fit` object.
@@ -268,3 +268,131 @@ methods::setGeneric("getSamples", function(object) methods::standardGeneric("get
 methods::setMethod("getSamples", "strainspy_fit", function(object) {
   names(object@residuals)
 })
+
+#' Accessors for strainspy_fit objects
+#'
+#' Getters for the per-feature statistics and fitting metadata stored in a
+#' `strainspy_fit` object. Use these rather than reaching into the object
+#' with `@`.
+#'
+#' @param object An object of class `strainspy_fit`.
+#' @return
+#' * `getRowData()`: a `DataFrame` of feature annotations, one row per feature.
+#' * `getCoefficients()`, `getStdErrors()`, `getPValues()`: `DataFrame`s of
+#'   per-feature estimates, one column per model term.
+#' * `getZIStdErrors()`, `getZIPValues()`: the zero-inflation counterparts, or
+#'   `NULL` when the model has no zero-inflation component.
+#' * `getVcov()`, `getZIVcov()`: a `List` of per-feature variance-covariance
+#'   matrices, or `NULL` when they were not stored.
+#' * `getDesign()`: the model formula.
+#' * `getFamily()`: the model family object.
+#' * `getFitCall()`: the call that produced the fit.
+#' * `isScaleContinuous()`: `TRUE` if continuous covariates were z-scored
+#'   before fitting.
+#' * `getConvergence()`: a logical vector, one entry per feature, `TRUE` where
+#'   the model converged.
+#' @examples
+#' meta <- read.csv(system.file("extdata", "example_metadata.csv.gz",
+#' package = "strainspy"))
+#' meta$Case_status <- factor(meta$Case_status)
+#' se <- read_sylph(system.file("extdata", "example_sylph_profile.tsv.gz",
+#' package = "strainspy"), meta_data = meta)
+#' fit <- glmZiBFit(filter_by_presence(se, min_nonzero = 30)[1:10, ],
+#' ~ Case_status + Age_at_collection, nthreads = 1, return_vcov = FALSE)
+#' head(getCoefficients(fit))
+#' getDesign(fit)
+#' isScaleContinuous(fit)
+#' @name strainspy_fit-accessors
+#' @rdname strainspy_fit-accessors
+NULL
+
+#' @rdname strainspy_fit-accessors
+#' @export
+methods::setGeneric("getRowData", function(object) methods::standardGeneric("getRowData"))
+#' @rdname strainspy_fit-accessors
+#' @export
+methods::setMethod("getRowData", "strainspy_fit", function(object) object@row_data)
+
+#' @rdname strainspy_fit-accessors
+#' @export
+methods::setGeneric("getCoefficients", function(object) methods::standardGeneric("getCoefficients"))
+#' @rdname strainspy_fit-accessors
+#' @export
+methods::setMethod("getCoefficients", "strainspy_fit", function(object) object@coefficients)
+
+#' @rdname strainspy_fit-accessors
+#' @export
+methods::setGeneric("getStdErrors", function(object) methods::standardGeneric("getStdErrors"))
+#' @rdname strainspy_fit-accessors
+#' @export
+methods::setMethod("getStdErrors", "strainspy_fit", function(object) object@std_errors)
+
+#' @rdname strainspy_fit-accessors
+#' @export
+methods::setGeneric("getPValues", function(object) methods::standardGeneric("getPValues"))
+#' @rdname strainspy_fit-accessors
+#' @export
+methods::setMethod("getPValues", "strainspy_fit", function(object) object@p_values)
+
+#' @rdname strainspy_fit-accessors
+#' @export
+methods::setGeneric("getZIStdErrors", function(object) methods::standardGeneric("getZIStdErrors"))
+#' @rdname strainspy_fit-accessors
+#' @export
+methods::setMethod("getZIStdErrors", "strainspy_fit", function(object) object@zi_std_errors)
+
+#' @rdname strainspy_fit-accessors
+#' @export
+methods::setGeneric("getZIPValues", function(object) methods::standardGeneric("getZIPValues"))
+#' @rdname strainspy_fit-accessors
+#' @export
+methods::setMethod("getZIPValues", "strainspy_fit", function(object) object@zi_p_values)
+
+#' @rdname strainspy_fit-accessors
+#' @export
+methods::setGeneric("getVcov", function(object) methods::standardGeneric("getVcov"))
+#' @rdname strainspy_fit-accessors
+#' @export
+methods::setMethod("getVcov", "strainspy_fit", function(object) object@vcov)
+
+#' @rdname strainspy_fit-accessors
+#' @export
+methods::setGeneric("getZIVcov", function(object) methods::standardGeneric("getZIVcov"))
+#' @rdname strainspy_fit-accessors
+#' @export
+methods::setMethod("getZIVcov", "strainspy_fit", function(object) object@zi_vcov)
+
+#' @rdname strainspy_fit-accessors
+#' @export
+methods::setGeneric("getDesign", function(object) methods::standardGeneric("getDesign"))
+#' @rdname strainspy_fit-accessors
+#' @export
+methods::setMethod("getDesign", "strainspy_fit", function(object) object@design)
+
+#' @rdname strainspy_fit-accessors
+#' @export
+methods::setGeneric("getFamily", function(object) methods::standardGeneric("getFamily"))
+#' @rdname strainspy_fit-accessors
+#' @export
+methods::setMethod("getFamily", "strainspy_fit", function(object) object@family)
+
+#' @rdname strainspy_fit-accessors
+#' @export
+methods::setGeneric("getFitCall", function(object) methods::standardGeneric("getFitCall"))
+#' @rdname strainspy_fit-accessors
+#' @export
+methods::setMethod("getFitCall", "strainspy_fit", function(object) object@call)
+
+#' @rdname strainspy_fit-accessors
+#' @export
+methods::setGeneric("isScaleContinuous", function(object) methods::standardGeneric("isScaleContinuous"))
+#' @rdname strainspy_fit-accessors
+#' @export
+methods::setMethod("isScaleContinuous", "strainspy_fit", function(object) object@scale_continuous)
+
+#' @rdname strainspy_fit-accessors
+#' @export
+methods::setGeneric("getConvergence", function(object) methods::standardGeneric("getConvergence"))
+#' @rdname strainspy_fit-accessors
+#' @export
+methods::setMethod("getConvergence", "strainspy_fit", function(object) object@convergence)

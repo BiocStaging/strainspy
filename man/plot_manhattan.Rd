@@ -9,7 +9,7 @@ plot_manhattan(
   coef = 2,
   taxonomy = NULL,
   aggregate_by_taxa = NULL,
-  method = "holm",
+  method = NULL,
   alpha = 0.05,
   tax_levels = c("Phylum", "Genus", "Species", "Strain"),
   plot = TRUE
@@ -24,7 +24,10 @@ plot_manhattan(
 
 \item{aggregate_by_taxa}{Logical. If TRUE, aggregate p-values across \code{tax_levels} and visualise as a stacked segment plot. Requires \code{taxonomy}. If NULL (default), the function automatically sets it to TRUE when \code{taxonomy} is provided.}
 
-\item{method}{Character. Multiple testing correction method for p-values (e.g., "holm"). Defaults to "holm". Only applicable if \code{aggregate_by_taxa = TRUE}.}
+\item{method}{Character. Multiple testing correction method. With \code{taxonomy}, it is passed to
+\code{hadjust()} and must be "HMP" or "bonferroni"; without, it is passed to \code{top_hits()} and must be
+one of "holm", "bonferroni", "BH" or "BY". Default \code{NULL}, meaning "HMP" with a taxonomy and
+"holm" without.}
 
 \item{alpha}{Numeric. Significance threshold for adjusted p-values. Defaults to 0.05.}
 
@@ -35,7 +38,7 @@ the legend is replaced by a named vector. Only applicable with \code{aggregate_b
 \item{plot}{If set to false, the function will return a tibble with data used to generate the plot. NOTE: Will be disregarded if taxonomy is provided with the option \code{aggregate_by_taxa = FALSE}.}
 }
 \value{
-A \code{ggplot} object showing the Manhattan plot if \code{plot = TRUE}, else a \code{data.frame} with plot data.
+A \code{ggplot} object showing the Manhattan plot if \code{plot = TRUE}, else a tibble with the plot data.
 }
 \description{
 This function can generate multiple Manhattan plots from a \code{strainspy_fit} object.

@@ -20,7 +20,7 @@ It performs the following:
 \itemize{
 \item Converts all integer columns to numeric.
 \item Converts character columns to numeric if they contain only numeric-like strings.
-\item Converts character columns to factors if they have fewer than \code{factor_threshold} unique (non-NA) values.
+\item Converts character columns to factors if they have at most \code{factor_threshold} unique (non-NA) values.
 \item Leaves all other character columns unchanged.
 Missing values (NAs) are preserved throughout.
 }

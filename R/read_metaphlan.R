@@ -1,18 +1,18 @@
 #' read_metaphlan
 #' 
-#' This function reads a merged `MetaPhlAn` profile output and create a SummarizedExperiment object. 
+#' This function reads a merged `MetaPhlAn` profile output and creates a SummarizedExperiment object. 
 #' An optional metadata table can be provided and added directly to `colData` via an internal call to `modify_metadata()`.
 #'
 #' @note Since `MetaPhlAn` profiles are usually generated per sample, first use `merge_metaphlan_files()` to merge and generate the input for this function.
 #' 
-#' #' If metadata is provided, it must meet the input requirements described in 
+#' If metadata is provided, it must meet the input requirements described in 
 #' `modify_metadata()`. If appending metadata fails due to pre processing requirements, 
 #' this function will issue a detailed warning and still return the `SummarizedExperiment` 
 #' object without metadata. In that case, apply necessary fixes and subsequently 
 #' call `modify_metadata()`. 
 #' 
 #' @param file_path Character. Path to the merged metaphlan output file.
-#' @param meta_data data.frame. An optional tibble or data frame containing sample metadata. See Details
+#' @param meta_data data.frame. An optional tibble or data frame containing sample metadata. See `?modify_metadata` for the requirements.
 #' @param variable Character. Name of the input variable to import. Defaults to `relative_abundance`.
 #' @param clean_names Logical. If `TRUE`, file paths will be stripped of their directory path and file extension,
 #' leaving only the base file name. Defaults to `TRUE`.
@@ -53,14 +53,14 @@ read_metaphlan <- function(file_path, meta_data=NULL, variable="relative_abundan
   ))
   
   required_columns <- c("query_name", "name", variable)
-  genome_and_contig = FALSE
+  genome_and_contig <- FALSE
   
   
   # Validate that the data contains the expected columns 
   missing_columns <- setdiff(required_columns, preview_col_names)
   if (length(missing_columns) > 0) {
-    stop(paste0("The following required columns are missing from the metaphlan file: ",
-                paste(missing_columns, collapse = ", ")))
+    missing_txt <- paste(missing_columns, collapse = ", ")
+    stop("The following required columns are missing from the metaphlan file: ", missing_txt)
   }
   
   
@@ -72,8 +72,8 @@ read_metaphlan <- function(file_path, meta_data=NULL, variable="relative_abundan
     select = required_columns
   )
   
-  colnames(metaphlan_data)[1] = "Sample_file" # we'll rename this to match with sylph
-  colnames(metaphlan_data)[2] = "Contig_name" # we'll rename this to match with sylph
+  colnames(metaphlan_data)[1] <- "Sample_file" # we'll rename this to match with sylph
+  colnames(metaphlan_data)[2] <- "Contig_name" # we'll rename this to match with sylph
   
   # Calculate row indices using
   metaphlan_data[, row_indices := .GRP, by = Contig_name]
@@ -85,36 +85,10 @@ read_metaphlan <- function(file_path, meta_data=NULL, variable="relative_abundan
   n_rows <- max(metaphlan_data$row_indices)
   n_cols <- max(metaphlan_data$col_indices)
   
-  # Merge metadata if provided
-  # if (is.null(meta_data)){
   # Generate colData
   col_data <- S4Vectors::DataFrame(unique(metaphlan_data[, .(Sample_file, col_indices)][order(col_indices)]))
   rownames(col_data) <- col_data[,1]
   col_data[['col_indices']] <- NULL
-  # } else {
-  #   col_data <- unique(metaphlan_data[, .(Sample_file, col_indices)][order(col_indices)])
-  #   
-  #   # Extract unique sample names
-  #   meta_samples <- unique(meta_data[[1]])
-  #   
-  #   # Warn about mismatched samples
-  #   if (length(missing_from_meta <- setdiff(col_data$Sample_file, meta_samples)) > 0) {
-  #     stop("The following samples from 'metaphlan_data' are not in 'meta_data': ", paste(missing_from_meta, collapse = ", "))
-  #   }
-  #   
-  #   if (length(missing_from_metaphlan <- setdiff(meta_samples, col_data$Sample_file)) > 0) {
-  #     stop("The following samples from 'meta_data' are not in 'metaphlan_data': ", paste(missing_from_metaphlan, collapse = ", "))
-  #   }
-  #   
-  #   col_data <- S4Vectors::DataFrame(base::merge(col_data, meta_data,
-  #                                                by.x = "Sample_file",
-  #                                                by.y = names(meta_data)[1],
-  #                                                all.x = TRUE)) # Keeps all Sample_file entries from metaphlan_data
-  #   
-  #   
-  #   rownames(col_data) <- col_data[["Sample_file"]]
-  #   col_data[['col_indices']] <- NULL
-  # }
   
   # Extract row metadata (rowData)
   # Generate row_data using unique combinations and indices
@@ -129,9 +103,9 @@ read_metaphlan <- function(file_path, meta_data=NULL, variable="relative_abundan
   
   # Deal with file names and extensions
   if (clean_names){
-    col_data$Sample_file <- tools::file_path_sans_ext(basename(col_data$Sample_file),
+    col_data$Sample_file <- file_path_sans_ext(basename(col_data$Sample_file),
                                                       compression = TRUE)
-    rownames(col_data) <- tools::file_path_sans_ext(basename(rownames(col_data)),
+    rownames(col_data) <- file_path_sans_ext(basename(rownames(col_data)),
                                                     compression = TRUE)
   }
   
@@ -139,7 +113,7 @@ read_metaphlan <- function(file_path, meta_data=NULL, variable="relative_abundan
   check_unique_names(rownames(col_data), "sample", clean_names)
   check_unique_names(rownames(row_data), "feature", clean_names)
 
-  se = SummarizedExperiment::SummarizedExperiment(
+  se <- SummarizedExperiment::SummarizedExperiment(
     assays = list(Matrix::sparseMatrix(
       i = metaphlan_data[['row_indices']],
       j = metaphlan_data[['col_indices']],
@@ -187,27 +161,27 @@ merge_metaphlan_files <- function(metaphlan_files, output_folder, output_filenam
   }
   
   header <- data.table::fread(metaphlan_files[1], nrows = 10, header = TRUE)  ### There are some leading comment lines, best to read beyond them nrows = 10
-  header = colnames(header)
+  header <- colnames(header)
   
   if(!"#clade_name" %in% header  | !"relative_abundance" %in% header){
     stop('#clade_name and relative_abundance columns are required!')
   }
   
   if(is.null(names(metaphlan_files))){
-    xx <- tools::file_path_sans_ext(basename(metaphlan_files),
+    xx <- file_path_sans_ext(basename(metaphlan_files),
                                     compression = TRUE)
     xx <- gsub("^.*(GC[A-Z]_\\d+\\.\\d+).*", "\\1", xx)
-    names(metaphlan_files) = xx
+    names(metaphlan_files) <- xx
   }
   
   # sgb files go to t__ level
   # gtdb files go to s__ level
   if(sgb_database == TRUE) {
     data_list <- lapply(seq_along(metaphlan_files), function(i) {
-      file = metaphlan_files[i]
-      tmp = data.table::fread(file);
-      tmp = tmp[, .(`#clade_name`, relative_abundance)]
-      tmp = tmp[grepl("t__", `#clade_name`)]
+      file <- metaphlan_files[i]
+      tmp <- data.table::fread(file);
+      tmp <- tmp[, .(`#clade_name`, relative_abundance)]
+      tmp <- tmp[grepl("t__", `#clade_name`)]
       tmp[, query_name := names(metaphlan_files)[i]]
       
       tmp[, genome := sub(".*t__", "", `#clade_name`)]  # Extract everything after "t__"
@@ -219,10 +193,10 @@ merge_metaphlan_files <- function(metaphlan_files, output_folder, output_filenam
     )
   } else {
     data_list <- lapply(seq_along(metaphlan_files), function(i) {
-      file = metaphlan_files[i]
-      tmp = data.table::fread(file);
-      tmp = tmp[, .(`#clade_name`, relative_abundance)]
-      tmp = tmp[grepl("s__", `#clade_name`)]
+      file <- metaphlan_files[i]
+      tmp <- data.table::fread(file);
+      tmp <- tmp[, .(`#clade_name`, relative_abundance)]
+      tmp <- tmp[grepl("s__", `#clade_name`)]
       tmp[, query_name := names(metaphlan_files)[i]]
       
       tmp[, genome := sub(".*s__", "", `#clade_name`)]  # Extract everything after "t__"

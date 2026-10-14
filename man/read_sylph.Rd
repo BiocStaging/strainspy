@@ -29,7 +29,7 @@ leaving only the base file name. Defaults to \code{TRUE}.}
 }
 \value{
 A SummarizedExperiment object with the following components:
-\item{assays}{A matrix containing numeric features such as \code{Adjusted_ANI}, \code{Taxonomic_abundance}, \code{Median_cov}, etc.}
+\item{assays}{A matrix of the selected \code{variable}, by default \code{Adjusted_ANI}.}
 \item{rowData}{DataFrame containing metadata for each sequence, such as \code{Contig_name} and \code{Genome_file}.}
 \item{colData}{DataFrame containing information for each sample (derived from the \code{Sample_file} field).}
 }

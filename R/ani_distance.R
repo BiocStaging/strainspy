@@ -3,13 +3,13 @@
 #' This function calculates the distance between samples in a `SummarizedExperiment` object representing strain level ANI data.
 #'
 #' @param se A `SummarizedExperiment` object.
-#' @param taxonomy An optional `data.frame` object containing the taxonomy information for the samples in `se`.
+#' @param taxonomy An optional `data.frame` containing the taxonomy of the genomes (rows) in `se`.
 #' The result of running read_taxonomy on the taxonomy file associated with the ANI data.
 #' If provided, the ANI values will be collapsed at the specified taxonomic level before calculating the distance matrix. (default=NULL)
 #' @param tax_level A character string specifying the taxonomic level at which to collapse the ANI values. (default="Species")
 #' @param collapse_method A character string specifying the method to use to collapse the ANI values. Must be one of 'representative', 'mean' or 'max'. (default='representative')
 #'
-#' @return A distance matrix.
+#' @return A `dist` object of distances between samples.
 #'
 #' @importFrom SummarizedExperiment assays rowData
 #' @importFrom purrr map
@@ -22,7 +22,7 @@
 #' package = "strainspy")
 #' se <- read_sylph(example_path)
 #' tax <- read_taxonomy(tax_path)
-#' distance_matrix <- ani_distance(se)
+#' distance_matrix <- ani_distance(se, tax)
 #'
 #' @export
 ani_distance <- function(se, taxonomy=NULL, tax_level="Species", collapse_method='representative') {
@@ -35,7 +35,7 @@ ani_distance <- function(se, taxonomy=NULL, tax_level="Species", collapse_method
   # Collapse at specified taxa level if taxonomy is provided
   if (!is.null(taxonomy)){
     fullm <- as.matrix(SummarizedExperiment::assays(se)[[1]])
-    grouping <- tax[[tax_level]][match(SummarizedExperiment::rowData(se)$Genome_file, tax$Genome)]
+    grouping <- taxonomy[[tax_level]][match(SummarizedExperiment::rowData(se)$Genome_file, taxonomy$Genome)]
     if (collapse_method=='representative') {
     ani_vals <- t(do.call(rbind, purrr::map(unique(grouping), ~ {
       index <- which.max(rowMeans(fullm[grouping == .x, , drop=FALSE]))
@@ -47,7 +47,7 @@ ani_distance <- function(se, taxonomy=NULL, tax_level="Species", collapse_method
       })))
     } else if (collapse_method=='max') {
       ani_vals <- t(do.call(rbind, purrr::map(unique(grouping), ~ {
-        return(colMaxs(fullm[grouping == .x, , drop=FALSE]))
+        return(apply(fullm[grouping == .x, , drop=FALSE], 2, max))
       })))
     } else {
       stop("Invalid collapse method. Must be 'representative', 'mean' or 'max'.")

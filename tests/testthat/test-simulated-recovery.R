@@ -2,10 +2,10 @@ testthat::test_that("glmZiBFit recovers a planted ANI effect", {
   s <- ss_sim()
   fit <- s$fit
 
-  testthat::expect_true(all(fit@convergence))
+  testthat::expect_true(all(getConvergence(fit)))
 
-  beta <- fit@coefficients$Case_statusPD
-  beta_p <- fit@p_values$Case_statusPD
+  beta <- getCoefficients(fit)$Case_statusPD
+  beta_p <- getPValues(fit)$Case_statusPD
 
   # Lower identity in PD must come back as a clearly negative coefficient
   testthat::expect_true(all(beta[s$planted] < 0))
@@ -18,7 +18,7 @@ testthat::test_that("glmZiBFit recovers a planted ANI effect", {
   testthat::expect_lt(max(beta[s$planted]), min(beta[s$nulls]))
 
   # Extra zeros in PD shift the zero-inflation component upwards on average
-  zi <- fit@zi_coefficients$Case_statusPD
+  zi <- getZICoefficients(fit)$Case_statusPD
   testthat::expect_gt(mean(zi[s$planted]), mean(zi[s$nulls]))
 })
 

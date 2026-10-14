@@ -16,7 +16,7 @@
 #' package = "strainspy")
 #' se <- read_sylph(example_path)
 #'
-#' # Filter to keep only rows with >20 non-zero entries 
+#' # Filter to keep only rows with at least 20 non-zero entries 
 #' filtered_se <- filter_by_presence(se, min_nonzero = 20)
 #'
 #' @export
@@ -28,7 +28,7 @@ filter_by_presence <- function(se, min_nonzero = 10) {
   }
 
   if(min_nonzero %% 1 != 0) {
-    stop("`min_zero` must be an integer.")
+    stop("`min_nonzero` must be an integer.")
   }
 
   if(min_nonzero > dim(se)[2]){
@@ -43,112 +43,6 @@ filter_by_presence <- function(se, min_nonzero = 10) {
   # Filter the assays, rowData, and colData in the SummarizedExperiment
   message("Retained ", sum(rows_to_keep), " rows after filtering")
   filtered_se <- se[rows_to_keep, ]
-  
-  # Return the filtered SummarizedExperiment
-  return(filtered_se)
-}
-
-#' Filter strains based on subject and time aware manner - useful for longitudinal datasets
-#'
-#' FThis function filters a SummarizedExperiment object to keep only rows (features/strains)
-#' present in at least `min_subjects` individuals and at least `min_timepoints` timepoints 
-#' per subject.
-#'
-#' @param se A `SummarizedExperiment` object.
-#' @param min_subjects Integer. Minimum number of subjects that must have the strain.
-#' @param min_timepoints Integer. Minimum number of non-zero timepoints per subject.Default is 3.
-#' @param subject_col Character. Column name in \code{colData(se)} corresponding to subject IDs. Default is 2.
-#' @param time_col Character. Column name in \code{colData(se)} corresponding to timepoints.
-#'
-#' @return A filtered `SummarizedExperiment` object with only the rows that meet the criteria.
-filter_by_presence_longitudinal <- function(se, min_subjects = 3, min_timepoints = 2, subject_col = "subject", time_col = "time") {
-  stopifnot(inherits(se, "SummarizedExperiment"))
-  
-  assay_mat <- SummarizedExperiment::assays(se)[[1]]
-  coldata <- SummarizedExperiment::colData(se)
-  
-  if (!(subject_col %in% colnames(coldata)) || !(time_col %in% colnames(coldata))) {
-    stop("subject_col and/or time_col not found in colData.")
-  }
-  
-  subject_list <- split(seq_len(ncol(assay_mat)), coldata[[subject_col]])
-  
-  keep_rows <- vapply(seq_len(nrow(assay_mat)), function(i) {
-    strain_row <- assay_mat[i, ]
-    subjects_with_enough <- sum(vapply(subject_list, function(cols) {
-      sum(strain_row[cols] != 0) >= min_timepoints
-    }, logical(1)))
-    subjects_with_enough >= min_subjects
-  }, logical(1))
-  
-  message("Retained ", sum(keep_rows), " rows after subject-aware filtering")
-  se[keep_rows, ]
-}
-
-
-#' filter_by_presence_with_rescale_abundance
-#'
-#' This function is copied from filter_by_presence(). Additionally, it rescales abundances such that
-#' each sample sums back to 100. Since this behaviour is not useful for association testing, this function is not exported. 
-#'
-#' @param se A `SummarizedExperiment` object.
-#' @param min_nonzero Integer. The minimum number of non-zero entries required to retain a row. Default is 10.
-#' @param rescale_abundance bool. Instead of containment ANI (e.g. sylph), if `assay(se)` contains relative abundance (e.g. `metaphlan`), set `rescale_abundance=TRUE`.
-#' After filtering, this rescales the remaining abundances to ensure they sum to 100.
-#'
-#' @return A filtered `SummarizedExperiment` object with only the rows that meet the criteria.
-#'
-#' @import SummarizedExperiment
-#'
-#' @examples
-#' example_path <- system.file("extdata", "example_sylph_profile.tsv.gz", 
-#' package = "strainspy")
-#' se <- read_sylph(example_path)
-#'
-#' # Filter to keep only rows with at least 10 non-zero entries in the assay
-#' filtered_se <- filter_by_presence(se)
-#'
-#' # View the filtered object
-#' filtered_se
-#'
-filter_by_presence_and_rescale <- function(se, min_nonzero = 10, rescale_abundance = FALSE) {
-  
-  # Check that the input is a SummarizedExperiment object
-  if (!inherits(se, "SummarizedExperiment")) {
-    stop("`se` must be a SummarizedExperiment object.")
-  }
-  
-  # Isn't it convenient to use an abundance threshold instead (like: 0.05 * ncol)?
-  if(min_nonzero %% 1 != 0) {
-    stop("`min_zero` must be an integer.")
-  }
-  
-  # Count the number of non-zero entries in each row of the assay
-  nonzero_counts <- Matrix::rowSums(SummarizedExperiment::assays(se)[[1]] != 0)
-  
-  # Identify which rows have at least 'min_nonzero' non-zero entries
-  rows_to_keep <- nonzero_counts >= min_nonzero
-  
-  # Filter the assays, rowData, and colData in the SummarizedExperiment
-  message("Retained ", sum(rows_to_keep), " rows after filtering")
-  
-  # diagnostic plot
-  ord = order(nonzero_counts)
-  # These are two statements, not one expression: plot() returns NULL
-  # invisibly, so the original `plot(...) + abline(...)` evaluated to
-  # NULL + NULL and only worked because both sides ran as arguments.
-  plot(nonzero_counts[ord], col = ifelse(rows_to_keep == TRUE, "red", "blue")[ord])
-  abline(h = min_nonzero)
-  
-  filtered_se <- se[rows_to_keep, ]
-  
-  if(rescale_abundance){
-    warning("Setting rescale_abundance=TRUE rescales each sample's abundances to sum to 100. 
-            This option should be not be used with ANI data and may interfere with association testing for abundance.")
-    asy = SummarizedExperiment::assay(filtered_se)
-    asy = apply(asy, 2, function(x) x/sum(x)*100)
-    SummarizedExperiment::assay(filtered_se) = asy
-  }
   
   # Return the filtered SummarizedExperiment
   return(filtered_se)

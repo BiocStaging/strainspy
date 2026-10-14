@@ -7,19 +7,19 @@
 #' @param se SummarizedExperiment. A `SummarizedExperiment` object containing the assay data and metadata.
 #' @param design Formula. A formula to specify the fixed and random effects, e.g., ` ~ Group + (1|Sample)`.
 #' @param nthreads An integer specifying the number of (CPUs or workers) to use. Defaults
-#'        to one 1.
+#'        to 1.
 #' @param scale_continuous Logical. If `TRUE`, all numeric columns in `colData(se)` are z-score standardized (mean = 0, SD = 1). Defaults to `TRUE`.
 #' @param MAP_prior One of `strainspy_priors` object, character string (`"preset_weak", "preset_strong"`),
-#' a `data.frame` of priors, or `NULL`. Default `"preset_weak"`. See Details. 
+#' a `data.frame` of priors, or `NULL`. Default `"preset_weak"`. See `?define_priors`. 
 #' @param BPPARAM Optional `BiocParallelParam` object. If not provided, the function
 #'        will configure an appropriate backend automatically.
 #' @param method Character. The method to use for fitting the model. Either 'glmmTMB' (default) or 'gamlss'.
-#' @param return_vcov Logical. Return variance-covariance matrices for each model, required for `estimate_effect_sizes()`. 
+#' @param return_vcov Logical. Return variance-covariance matrices for each model, required for `comp_ani_diff_and_posthoc_test()`. 
 #' Disabling will result in a much smaller `strainspy_fit` object that is useful for most analyses. Defaults to `TRUE`.
 #' @param progress Logical. If `TRUE` (default), progress bars and progress messages are printed. Set to `FALSE` to silence them.
 #'
 #' @return A `strainspy_fit` object with the following components:
-#' \item{row_data}{A DFrame with 6 slots with feature details}
+#' \item{row_data}{The `rowData` of `se` for the fitted features}
 #' \item{coefficients}{A DFrame with coefficients for each feature}
 #' \item{std_errors}{A DFrame of standard errors for each feature}
 #' \item{p_values}{A DFrame of p-values for each feature}
@@ -60,22 +60,9 @@ glmZiBFit <- function(se, design, nthreads=1, scale_continuous=TRUE,
   check_progress(progress)
   method <- match.arg(method, choices = c("glmmTMB", "gamlss"))
 
-  # Check if glmmTMB is installed when selected as backend
-  if (method == "glmmTMB" && !requireNamespace("glmmTMB", quietly = TRUE)) {
-    stop("The 'glmmTMB' package is required for method = 'glmmTMB' but is not installed. Please install it with install.packages('glmmTMB').")
-  }
-
   # Check if gamlss is installed when selected as backend
   if (method == "gamlss") {
-    missing_pkgs <- c("gamlss", "gamlss.dist")[
-      !vapply(c("gamlss", "gamlss.dist"), requireNamespace, logical(1), quietly = TRUE)
-    ]
-    if (length(missing_pkgs) > 0) {
-      stop("The following package(s) are required for method = 'gamlss' but are not installed: ",
-           paste(missing_pkgs, collapse = ", "),
-           ". Please install them with install.packages(c(",
-           paste0('"', missing_pkgs, '"', collapse = ", "), ")).")
-    }
+    require_suggested(c("gamlss", "gamlss.dist"), "method = 'gamlss'")
   }
   
   # Validate input
@@ -83,26 +70,14 @@ glmZiBFit <- function(se, design, nthreads=1, scale_continuous=TRUE,
     stop("`se` must be a SummarizedExperiment object.")
   }
   
-  # colData (sample metadata)
+  # Sample metadata from colData
   col_data <- colData(se)
   if (scale_continuous==TRUE){
-    for (col in names(col_data)) {
-      if (is.numeric(col_data[[col]])) {
-        col_data[[col]] <- scale(col_data[[col]])  # Scale numeric columns
-      }
-    }
+    col_data <- scale_numeric_columns(col_data)
   }
   
-  # Ensure the design is a formula
-  if (!inherits(design, "formula")) {
-    stop("`design` must be a formula (e.g., ~ batch + condition).")
-  }
-  
-  # check if formula is valid
-  nbd = nobars_(design)
-  if(is.null(nbd)){
-    stop(paste(paste(design, collapse = ''), "--- is not a valid formula."))
-  } 
+  # Ensure the design is a valid formula
+  nbd <- check_design_formula(design)
   
   combined_formula <- as.formula(paste(c("Value", as.character(design)),
                                        collapse = " "))
@@ -112,25 +87,12 @@ glmZiBFit <- function(se, design, nthreads=1, scale_continuous=TRUE,
     stop("Column names of assay data do not match row names of colData.")
   }
   
-  prior_obj = resolve_priors(MAP_prior, se, nbd)
-  # prior_obj is NULL when MAP_prior = NULL (unpenalised / MLE fit)
-  fixed_priors = if (is.null(prior_obj)) NULL else prior_obj@priors_df
+  prior_obj <- resolve_priors(MAP_prior, se, nbd)
+  # prior_obj is NULL when MAP_prior is NULL, i.e. an unpenalised MLE fit
+  fixed_priors <- if (is.null(prior_obj)) NULL else getPriorsDf(prior_obj)
   
   # Set up parallel infrastructure
-  if ((nthreads > 1) & (.Platform$OS.type != "windows")) {
-    # Check the operating system and set the backend accordingly
-    if (is.null(BPPARAM)) {
-      # Use MulticoreParam for Unix-like systems
-      # BPPARAM <- BiocParallel::MulticoreParam(
-      #   workers = nthreads
-      # )
-      BPPARAM <- BiocParallel::SnowParam(workers = nthreads, progressbar = progress, tasks=100)
-    } else if (!progress) {
-      BiocParallel::bpprogressbar(BPPARAM) <- FALSE
-    }
-  } else {
-    BPPARAM <- BiocParallel::SerialParam(progressbar = progress)
-  }
+  BPPARAM <- setup_bpparam(nthreads, BPPARAM, progress, tasks = 100)
   
   # Split rows into 50-row chunks
   row_chunks <- split(
@@ -166,12 +128,12 @@ glmZiBFit <- function(se, design, nthreads=1, scale_continuous=TRUE,
   
   # Drop features whose fit failed. See `failed_fit_index()` for why both the
   # zero-length and the NA-log_likelihood protocols have to be handled.
-  rmidx = failed_fit_index(results)
+  rmidx <- failed_fit_index(results)
   if(length(rmidx) > 0) {
-    seRD = SummarizedExperiment::rowData(se)[-rmidx, , drop = FALSE]
+    seRD <- SummarizedExperiment::rowData(se)[-rmidx, , drop = FALSE]
     results[rmidx] <- NULL
   } else {
-    seRD = SummarizedExperiment::rowData(se)
+    seRD <- SummarizedExperiment::rowData(se)
   }
   
   # Create the strainspy_fit object
@@ -236,6 +198,7 @@ glmZiBFit <- function(se, design, nthreads=1, scale_continuous=TRUE,
 #'         log-likelihood, and convergence status.
 #'
 #' @importFrom stats residuals
+#' @noRd
 fit_zero_inflated_beta <- function(se_subset, col_data, combined_formula, design, fixed_priors) {
   chunk_results <- lapply(seq_len(nrow(se_subset)), function(row_index){
     # Extract the values for the current feature
@@ -310,6 +273,7 @@ fit_zero_inflated_beta <- function(se_subset, col_data, combined_formula, design
 #'         log-likelihood, and convergence status.
 #'
 #' @importFrom stats residuals
+#' @noRd
 fit_zero_inflated_beta_gamlss <- function(se_subset, col_data, combined_formula, design, fixed_priors,
                                           progress = TRUE) {
   if (progress) message("Fitting model...")
@@ -333,10 +297,6 @@ fit_zero_inflated_beta_gamlss <- function(se_subset, col_data, combined_formula,
         data = temp_dat,
         family = gamlss.dist::BEZI,
         control = gamlss::gamlss.control(trace=FALSE),
-        # mu.start = 0.5,
-        # nu.start = 0.3,
-        # sigma.start = 1,
-        # tau.start = 1
       )
     }, error = function(e) {
       return(NULL)

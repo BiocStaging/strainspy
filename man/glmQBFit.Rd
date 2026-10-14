@@ -2,14 +2,13 @@
 % Please edit documentation in R/glmQBFit.R
 \name{glmQBFit}
 \alias{glmQBFit}
-\title{glmQBFit
-TODO: Implement return of vcov info. Patched for compatibility (returns NULL)}
+\title{glmQBFit}
 \usage{
 glmQBFit(
   se,
   design,
   nthreads = 1L,
-  scale_continous = TRUE,
+  scale_continuous = TRUE,
   BPPARAM = NULL,
   progress = TRUE
 )
@@ -22,10 +21,10 @@ the assay data and metadata.}
 \code{ ~ Age + BMI}.}
 
 \item{nthreads}{An integer specifying the number of (CPUs or workers) to use.
-Defaults to one 1.}
+Defaults to 1.}
 
-\item{scale_continous}{Logical. If \code{TRUE}, all numeric columns in
-\code{colData(se)} are z-score standardized (mean = 0, SD = 1). Default \code{FALSE}.}
+\item{scale_continuous}{Logical. If \code{TRUE}, all numeric columns in
+\code{colData(se)} are z-score standardized (mean = 0, SD = 1). Default \code{TRUE}.}
 
 \item{BPPARAM}{Optional \code{BiocParallelParam} object. If not provided, the
 function will configure an appropriate backend automatically.}
@@ -34,7 +33,7 @@ function will configure an appropriate backend automatically.}
 }
 \value{
 A \code{strainspy_fit} object with the following components:
-\item{row_data}{A DFrame with 6 slots with feature details}
+\item{row_data}{The \code{rowData} of \code{se} for the fitted features}
 \item{coefficients}{A DFrame with coefficients for each feature}
 \item{std_errors}{A DFrame of standard errors for each feature}
 \item{p_values}{A DFrame of p-values for each feature}
@@ -50,6 +49,10 @@ This function fits a quasibinomial regression model using \code{stats::glm()}.
 It takes a \code{SummarizedExperiment} object as input, along with a user-defined
 formula containing only fixed effect parameters, and fits a quasibinomial
 regression model on the assay data.
+
+Variance-covariance matrices are not returned by this fitter: the \code{vcov} slot
+of the result is \code{NULL}, so the fit cannot be used with
+\code{comp_ani_diff_and_posthoc_test()}.
 }
 \examples{
 library(strainspy)

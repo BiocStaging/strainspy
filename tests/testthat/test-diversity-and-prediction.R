@@ -50,8 +50,18 @@ testthat::test_that("richness and beta-diversity utilities return expected struc
 testthat::test_that("strainspy_fit accessor methods return coherent values", {
   fit_z <- ss_fit_zib()
 
-  testthat::expect_equal(length(strainspy::getContigNames(fit_z)), nrow(fit_z@row_data))
-  testthat::expect_equal(length(strainspy::getGenomes(fit_z)), nrow(fit_z@row_data))
+  testthat::expect_equal(length(strainspy::getContigNames(fit_z)), nrow(getRowData(fit_z)))
+  testthat::expect_equal(length(strainspy::getGenomes(fit_z)), nrow(getRowData(fit_z)))
   testthat::expect_s4_class(strainspy::getResiduals(fit_z), "DFrame")
   testthat::expect_s4_class(strainspy::getZICoefficients(fit_z), "DFrame")
+})
+
+testthat::test_that("ani_distance collapses by taxonomy with every collapse method", {
+  d <- ss_test_data()
+  se_small <- d$se_filtered[1:20, ]
+  for (m in c("representative", "mean", "max")) {
+    dd <- strainspy::ani_distance(se_small, taxonomy = d$taxonomy, tax_level = "Genus", collapse_method = m)
+    testthat::expect_s3_class(dd, "dist")
+    testthat::expect_equal(attr(dd, "Size"), ncol(se_small))
+  }
 })

@@ -36,6 +36,8 @@ Strain-level microbiome-wide association studies from metagenomic ANI profiles.
 
 ## Installation
 
+StrainSpy will be available via BioConductor soon. In the meantime, you can install the latest version from R-universe:
+
 ```{r, eval = FALSE}
 install.packages("BiocManager")
 install.packages("strainspy",
@@ -49,7 +51,7 @@ For `conda` and other options, see [alternative installation options](#alternati
 
 **NOTE: A guide for using StrainSpy with your own data is provided [below](#analysing-your-own-data).**
 
-This quick start demonstrates a typical `StrainSpy` analysis and showcases some of the models and outputs available. Here, we analyse a 200 sample subset of the data described in [Wallen *et al.* 2022](https://doi.org/10.1038/s41467-022-34667-x). 
+This quick start demonstrates a typical `StrainSpy` analysis and showcases some of the models and outputs available. Here, we analyse a 200-sample subset of the data described in [Wallen *et al.* 2022](https://doi.org/10.1038/s41467-022-34667-x). 
 
 ```{r, fig.width =8, fig.height=6, fig.align='center'}
 library(strainspy)
@@ -99,20 +101,23 @@ plot_volcano(fit, label = T)
 knitr::kable(th)
 ```
 
-*Coprobacillus cateniformis* shows difference in presence (adjusted p = 0.0213). *Clostridiales bacterium* shows difference in identity (adjusted p < 0.01). 
+*Coprobacillus cateniformis* shows a difference in presence (adjusted p = 0.0213). *Clostridiales bacterium* shows a difference in identity (adjusted p = 0.048). 
 
 ### Perform post-hoc testing to validate the beta hit
 
 ```{r}
 th = comp_ani_diff_and_posthoc_test(se, fit, th, progress = FALSE)
 
-# This NA indicates posthoc testing does not invalidate this beta hit
+knitr::kable(th)
+
+# Comment = NA indicates posthoc testing does not invalidate this beta hit
 is.na(th$Comment)
 
-th$ANI_Difference
+# Average difference in ANI value
+th$ANI_Difference[2]
 ```
 
-In *Clostridiales bacterium*, average ANI (green dashed line) is 0.25% lower in Controls compared to Parkinson Disease (PD). The distribution appears different between groups.
+In *Clostridiales bacterium*, average ANI (green dashed line) is 0.25% lower in Controls compared to Parkinson's disease (PD). The distribution appears different between groups.
 
 ## Visualise the distribution of top hits with Case_status
 
@@ -150,7 +155,6 @@ ggplot(df_rch, aes(Case_status, value, fill = Case_status)) +
   geom_boxplot(outlier.shape = NA) +
   geom_jitter(width = 0.15, alpha = 0.4) +
   theme_classic() + ylab("Number of Species")
-
 ```
 
 ## Estimate between sample diversity
@@ -167,7 +171,7 @@ divs$plots$NMDS
 ```{r}
 example_sourmash_path <- system.file("extdata", "example_sourmash.csv.gz", package = "strainspy")
 sm <- read_sourmash(example_sourmash_path, meta_data)
-print(sm)
+show(sm)
 ```
 
 **Note:** `strainspy` provides a function to merge `sourmash gather` and `sourmash search` outputs. See help for details.
@@ -177,7 +181,7 @@ print(sm)
 example_metaphlan_path <- system.file("extdata", "metaphlan_merged.tsv.gz", package = "strainspy")
 example_taxonomy_path <- system.file("extdata", "metaphlan_taxonomy.tsv.gz", package = "strainspy")
 mp <- read_metaphlan(example_metaphlan_path, meta_data)
-print(mp)
+show(mp)
 ```
  
 **Note:** `strainspy` provides a function to merge `MetaPhlAn` profiles and generate the taxonomy file. See help for details.
@@ -220,11 +224,11 @@ Running Sylph separately on hundreds or thousands of metagenomes can be cumberso
 
 ### Taxonomy data
 
-Relevant taxonomy `tsv` files for each database is available for download at [Zenodo](https://zenodo.org/records/21796878).
+Relevant taxonomy `tsv` files for each database are available for download at [Zenodo](https://zenodo.org/records/21796878).
 
 ### Metadata
 
-A metadata `tsv` file (optionally `gz` compressed) needs to be prepared for each dataset before analysis. Each sample should be in a single row, and each column should contain a metadata variable. The first column should be named `run_accession` and contain the unique sample identifiers that exactly match the Sylph output file. See the example files provided with the package for guidance, available at `inst/extdata/`.
+A metadata `csv` or `tsv` file (optionally `gz` compressed) needs to be prepared for each dataset before analysis. Each sample should be in a single row, and each column should contain a metadata variable. The first column must contain the unique sample identifiers that exactly match the Sylph output file. See the example files provided with the package for guidance, available at `inst/extdata/`.
 
 
 ## Alternative installation options
@@ -247,6 +251,17 @@ conda activate strainspy
 ```
 
 See the [Bioconda recipe page](http://bioconda.github.io/recipes/r-strainspy/README.html) for more information.
+
+### Container
+
+A container image is also available via bioconda, hosted on [quay.io](https://quay.io/repository/biocontainers/r-strainspy?tab=tags). You can use it with your favourite container runtime, e.g., Docker, Podman, or Apptainer/Singularity.
+
+**Example with Apptainer**
+
+```bash
+apptainer pull docker://quay.io/biocontainers/r-strainspy:0.99.1--r45hdfd78af_0
+apptainer exec r-strainspy_0.99.1--r45hdfd78af_0.sif R
+```
 
 ### Github Version
 

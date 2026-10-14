@@ -1,19 +1,19 @@
-#' Generate a Volcano Plot from a betaGLM Object
+#' Generate a Volcano Plot from a strainspy_fit Object
 #'
-#' This function creates a volcano plot from the results of a betaGLM analysis,
+#' This function creates a volcano plot from the results of a strainspy model fit,
 #' highlighting the relationship between effect size (coefficients) and statistical significance (-log10 p-values).
 #'
 #' @importFrom viridis viridis
 #' 
 #' @param object A strainspy_fit object containing model results.
-#' @param coef Integer, specifying the phenotype index of the betaGLM to extract p values and effect size for plotting. Default is 2.
-#' @param alpha Float indicating signficance level. Default is 0.05
+#' @param coef Integer, specifying the coefficient index of the fit to extract p values and effect size for plotting. Default is 2.
+#' @param alpha Float indicating significance level. Default is 0.05
 #' @param method The method for p-value adjustment. For available options, see `?top_hits()`. Default `holm`.
 #' @param palette A vector of user defined palette to colour plot. Default is the viridis palette.
-#' @param label Logical, whether to label most signifcant points of the plot with Species name.
-#' @param contig_names Optional character vector to replace long contig names in the plot.
+#' @param label Logical, whether to label most significant points of the plot with Species name.
+#' @param contig_names Optional character vector of labels for the significant hits.
 #' Must match the length and order of `top_hits(object, coef = coef, alpha = alpha)$Contig_name`.
-#' If NULL (default), shortening will be attempted automatically.
+#' If NULL (default), contig names are shortened automatically.
 #' @param plot Logical, whether to return a ggplot object (default: TRUE). If FALSE, returns the processed data.
 #'
 #'
@@ -47,11 +47,22 @@ plot_volcano <- function(object, coef = 2, alpha = 0.05, method = "holm",
   
   # contig names provided
   if(!is.null(contig_names)){
-    n_contigs = nrow(top_hits(object, coef = coef, alpha = alpha))  
-    if(length(contig_names) != nrow(top_hits(object, coef = coef, alpha = alpha))){
+    sig_hits <- top_hits(object, coef = coef, alpha = alpha)
+    n_contigs <- nrow(sig_hits)
+    if(length(contig_names) != n_contigs){
       stop(sprintf("Provided %d `contig_names`, but there are %d top_hits contigs at alpha = %.3f", 
                    length(contig_names), n_contigs, alpha))
     }
+    names(contig_names) <- sig_hits$Contig_name
+  }
+  # Label text: user-supplied names where given, otherwise shortened contig names
+  label_for <- function(x) {
+    lab <- clean_contig_names(x)
+    if (!is.null(contig_names)) {
+      hit <- !is.na(contig_names[x])
+      lab[hit] <- contig_names[x][hit]
+    }
+    lab
   }
   
   # Checks if multiple models exist in the fit
@@ -61,15 +72,15 @@ plot_volcano <- function(object, coef = 2, alpha = 0.05, method = "holm",
     p <- hits |>
       tidyr::pivot_longer(cols = c(p_value, zi_p_value), names_to = 'Model', values_to = 'p') |>
       dplyr::select(Genome_file, Model, p) |>
-      dplyr::mutate(Model = ifelse(stringr::str_detect(Model, 'zi'), 'ZiB', 'Beta'))
+      dplyr::mutate(Model = ifelse(str_detect(Model, 'zi'), 'ZiB', 'Beta'))
     p_adj <- hits |>
       tidyr::pivot_longer(cols = c(p_adjust, zi_p_adjust), names_to = 'Model', values_to = 'p_adj') |>
       dplyr::select(Genome_file, Model, p_adj) |>
-      dplyr::mutate(Model = ifelse(stringr::str_detect(Model, 'zi'), 'ZiB', 'Beta'))
+      dplyr::mutate(Model = ifelse(str_detect(Model, 'zi'), 'ZiB', 'Beta'))
     hits <- hits |>
       tidyr::pivot_longer(cols = c(coefficient,zi_coefficient),
                           names_to = 'Model', values_to = 'Coefficient') |>
-      dplyr::mutate(Model = ifelse(stringr::str_detect(Model, 'zi'), 'ZiB', 'Beta')) |>
+      dplyr::mutate(Model = ifelse(str_detect(Model, 'zi'), 'ZiB', 'Beta')) |>
       dplyr::inner_join(p, by = c('Genome_file', 'Model')) |>
       dplyr::inner_join(p_adj, by = c('Genome_file', 'Model'))
     
@@ -90,10 +101,10 @@ plot_volcano <- function(object, coef = 2, alpha = 0.05, method = "holm",
       ggplot2::ylab('-log10(p)')
     
     if(label) {
-      lab_dat = hits[hits$p_adj < alpha,]
+      lab_dat <- hits[hits$p_adj < alpha,]
       if(nrow(lab_dat) > 0){
-        plot <- plot + ggrepel::geom_text_repel(data = lab_dat,
-                                                mapping = ggplot2::aes(label = clean_contig_names(Contig_name)),
+        plot <- plot + geom_text_repel(data = lab_dat,
+                                                mapping = ggplot2::aes(label = label_for(Contig_name)),
                                                 colour = 'black',
                                                 size = 2.5,
                                                 alpha = 0.8,
@@ -121,8 +132,8 @@ plot_volcano <- function(object, coef = 2, alpha = 0.05, method = "holm",
     # If labels are requested, then add.
     if(label){
       if(any(hits$p_adjust < alpha)) {
-        plot <- plot + ggrepel::geom_text_repel(data = hits[hits$p_adjust < alpha,],
-                                                mapping = aes(label = clean_contig_names(Contig_name)),
+        plot <- plot + geom_text_repel(data = hits[hits$p_adjust < alpha,],
+                                                mapping = aes(label = label_for(Contig_name)),
                                                 colour = 'black',
                                                 size = 5,
                                                 alpha = 0.8,

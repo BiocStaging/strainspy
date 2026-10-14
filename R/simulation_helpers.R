@@ -3,9 +3,10 @@
 #' This function applies a simple linear transformation to simulate a treatment effect.
 #'
 #' @param x a vector of sequence identity values to transform
-#' @param beta simulate a decreased in identiy by factor of beta (default=0.95)
+#' @param beta simulate a decrease in identity by factor of beta (default=0.95)
 #' @param zi simulate an increased shift in the proportion of zeros by zi (default=0.1)
 #' @return a vector of transformed values
+#' @noRd
 rescale_beta <- function(x, beta = 0.98, zi=0.1) {
   
   # Ensure x is between 0 and 1
@@ -27,7 +28,7 @@ rescale_beta <- function(x, beta = 0.98, zi=0.1) {
   if(p2 > p1){ # when zi > 0
     # We cannot guarantee this won't fail for very small zi values, if that happens, return input
     sz <- rbinom(1, length(x_rescaled), p2) - sum(x_rescaled==0)
-    nz = which(x_rescaled!=0)
+    nz <- which(x_rescaled!=0)
     if(sz < length(nz) & sz > 0) {
       selected <- sample(which(x_rescaled!=0), sz, replace=FALSE)
       x_rescaled[selected] <- 0
@@ -61,6 +62,7 @@ rescale_beta <- function(x, beta = 0.98, zi=0.1) {
 #'
 #' @import SummarizedExperiment
 #' @importFrom glmmTMB glmmTMB
+#' @noRd
 update_fit <- function(fit, update_idx, 
                        se, scale_continuous=TRUE,
                        min_identity=0.98, method='glmmTMB', 
@@ -78,18 +80,18 @@ update_fit <- function(fit, update_idx,
   }
   
   # what was fitted?
-  fit_type = "Unknown"
-  fits = c("glmZiBFit", "glmObFit", "caseControlFit")
-  mtch = which(fits %in% as.character(fit@call[[1]]))
-  if(length(mtch) != 0) fit_type = fits[mtch]
+  fit_type <- "Unknown"
+  fits <- c("glmZiBFit", "glmObFit", "caseControlFit")
+  mtch <- which(fits %in% as.character(getFitCall(fit)[[1]]))
+  if(length(mtch) != 0) fit_type <- fits[mtch]
   
   if(fit_type == "Unknown") {
     stop("`fit` type must be one of glmZiBFit, glmObFit or caseControlFit")
   }
   
   # modify data to subset update_idx
-  se_subset = se[update_idx,]
-  design = as.formula(fit@call[["design"]])
+  se_subset <- se[update_idx,]
+  design <- as.formula(getFitCall(fit)[["design"]])
   
   switch(fit_type,
          "glmZiBFit" = {
@@ -117,39 +119,42 @@ update_fit <- function(fit, update_idx,
          }
   )
   
-  # let's update fit
+  # Overwrite the refitted rows in place. Direct slot assignment is used here
+  # deliberately: this helper is not exported and exists only so the
+  # manuscript's simulation and recovery experiments can be reproduced; the
+  # package itself never modifies a strainspy_fit after construction.
   if ("coefficients" %in% slotNames(fit)) {
-    fit@coefficients[update_idx, ] = fit_u@coefficients
+    fit@coefficients[update_idx, ] <- getCoefficients(fit_u)
   }
   
   if ("std_errors" %in% slotNames(fit)) {
-    fit@std_errors[update_idx, ] = fit_u@std_errors
+    fit@std_errors[update_idx, ] <- getStdErrors(fit_u)
   }
   
   if ("p_values" %in% slotNames(fit)) {
-    fit@p_values[update_idx, ] = fit_u@p_values
+    fit@p_values[update_idx, ] <- getPValues(fit_u)
   }
   
   if ("residuals" %in% slotNames(fit)) {
-    fit@residuals[update_idx, ] = fit_u@residuals
+    fit@residuals[update_idx, ] <- getResiduals(fit_u)
   }
   
   # These are not present in all models, check NULLs as well
   if ("zi_coefficients" %in% slotNames(fit)) {
-    if(!is.null(fit@zi_coefficients)){
-      fit@zi_coefficients[update_idx, ] = fit_u@zi_coefficients
+    if(!is.null(getZICoefficients(fit))){
+      fit@zi_coefficients[update_idx, ] <- getZICoefficients(fit_u)
     }
   }
   
   if ("zi_std_errors" %in% slotNames(fit)) {
-    if(!is.null(fit@zi_std_errors)){
-      fit@zi_std_errors[update_idx, ] = fit_u@zi_std_errors
+    if(!is.null(getZIStdErrors(fit))){
+      fit@zi_std_errors[update_idx, ] <- getZIStdErrors(fit_u)
     }
   }
   
   if ("zi_p_values" %in% slotNames(fit)) {
-    if(!is.null(fit@zi_p_values)){
-      fit@zi_p_values[update_idx, ] = fit_u@zi_p_values
+    if(!is.null(getZIPValues(fit))){
+      fit@zi_p_values[update_idx, ] <- getZIPValues(fit_u)
     }
   }
   
@@ -164,25 +169,26 @@ update_fit <- function(fit, update_idx,
 
 #' Generate a confusion matrix for a fitted model
 #'
-#' @param top_hits Output from `tophits(fit)`
+#' @param top_hits Output from `top_hits(fit)`
 #' @param gt_contigs Vector of ground truth contigs 
 #' @param all_contigs Vector of all contigs
 #' @param print_cm logical. Print the confusion matrix (default = TRUE)
 #'        
 #' @return Confusion Matrix.
+#' @noRd
 get_confusion_mx <- function(top_hits, gt_contigs, all_contigs, print_cm = TRUE) {
-  cm = matrix(c( sum(top_hits$Contig_name %in% gt_contigs),
-                 sum( !(top_hits$Contig_name %in% gt_contigs) ), 
-                 sum( !(gt_contigs %in% top_hits$Contig_name) ), 
-                 sum( !(all_contigs %in% c(top_hits$Contig_name, gt_contigs) ) ) ), 
-              nrow = 2, 
+  cm <- matrix(c( sum(top_hits$Contig_name %in% gt_contigs),
+                 sum(!(top_hits$Contig_name %in% gt_contigs)),
+                 sum(!(gt_contigs %in% top_hits$Contig_name)),
+                 sum(!(all_contigs %in% c(top_hits$Contig_name, gt_contigs)))),
+              nrow = 2,
               byrow = TRUE,
-              dimnames = list("Detected" = c("Positive", "Negative"), 
+              dimnames = list("Detected" = c("Positive", "Negative"),
                               "Actual" = c("Positive", "Negative")))
   if(print_cm == TRUE) {
-    print(cm)
+    cm_txt <- paste(utils::capture.output(cm), collapse = "\n")
+    message(cm_txt)
   }
-  
   return(cm)
 }
 
@@ -193,7 +199,7 @@ get_confusion_mx <- function(top_hits, gt_contigs, all_contigs, print_cm = TRUE)
 #' @param object A `strainspy_fit` object.
 #' @param coef The number of the coefficient from which to generate the plot (default=2).
 #' @param taxonomy An optional taxonomy file read using strainspy::read_taxonomy (default=NULL).
-#' @param method Character. Multiple testing correction method for p-values (e.g., "holm"). Defaults to "holm".
+#' @param method Character. Multiple testing correction method; see `plot_manhattan()`. Default `NULL`, meaning "HMP" with a taxonomy and "holm" without.
 #' @param alpha Numeric. Significance threshold for adjusted p-values. Defaults to 0.05.
 #' @param levels Character vector. Taxonomic levels to include in the plot when `taxonomy` is provided. Defaults to c("Phylum", "Genus", "Species", "Strain").
 #' @param colour_level Character. Taxonomic level used for coloring the plot segments. Defaults to "Phylum".
@@ -203,13 +209,17 @@ get_confusion_mx <- function(top_hits, gt_contigs, all_contigs, print_cm = TRUE)
 #' @import ggplot2
 #' @importFrom tidyr pivot_longer
 #' @importFrom dplyr mutate
-plot_manhattan_gt <- function(object, coef=2, taxonomy=NULL, method = "HMP",
+#' @noRd
+plot_manhattan_gt <- function(object, coef=2, taxonomy=NULL, method = NULL,
                               alpha=0.05, levels = c("Phylum", "Genus", "Species", "Strain"),
                               colour_level = "Phylum", plot=TRUE, ground_truth = NULL) {
   
   # Validate input
   if (!inherits(object, "strainspy_fit")) {
     stop("Input must be a strainspy_fit object.")
+  }
+  if (is.null(method)) {
+    method <- if (!is.null(taxonomy)) "HMP" else "holm"
   }
   
   # Create tidy tibbles for plotting
@@ -225,12 +235,12 @@ plot_manhattan_gt <- function(object, coef=2, taxonomy=NULL, method = "HMP",
     # Add sequence level adjusted p-values
     hits <- top_hits(object, coef=coef, method = method, alpha = 1)
     
-    plot_data <- hits[,c(colnames(object@row_data), "p_adjust")] |>
+    plot_data <- hits[,c(colnames(getRowData(object)), "p_adjust")] |>
       tibble::add_column(Model="Beta", .before=1)
     
     if ('zi_p_adjust' %in% colnames(hits)) {
       plot_data <- rbind(plot_data,
-                         hits[,c(colnames(object@row_data), "zi_p_adjust")] |>
+                         hits[,c(colnames(getRowData(object)), "zi_p_adjust")] |>
                            dplyr::rename(p_adjust = "zi_p_adjust") |>
                            tibble::add_column(Model="Zero-Inflated", .before=1))
     }
@@ -243,7 +253,7 @@ plot_manhattan_gt <- function(object, coef=2, taxonomy=NULL, method = "HMP",
   
   plot_data$log_p_adjust <- -log10(plot_data$p_adjust)
   
-  if(!is.null(ground_truth)) plot_data$ground_truth = as.factor(plot_data$Name %in% ground_truth)
+  if(!is.null(ground_truth)) plot_data$ground_truth <- as.factor(plot_data$Name %in% ground_truth)
   
   # Create the Manhattan plot
   if (!is.null(taxonomy)){
@@ -276,7 +286,7 @@ plot_manhattan_gt <- function(object, coef=2, taxonomy=NULL, method = "HMP",
     custom_colors <- custom_colors[seq_along(unique(plot_data$Phylum))]
     
     gg <- ggplot2::ggplot(plot_data, aes(x = Name, y = log_p_adjust, colour=Phylum)) +
-      ggplot2::geom_segment(aes(y = log_p_adjust, x = index_min - 0.5, xend = index_max + 0.5), size=5) +
+      ggplot2::geom_segment(aes(y = log_p_adjust, x = index_min - 0.5, xend = index_max + 0.5), linewidth = 5) +
       ggplot2::facet_grid(Level ~ Model, scales = "free_x") +
       geom_hline(aes(yintercept = -log10(alpha)), col='red', linetype = "dotted") +
       scale_color_manual(values = custom_colors) +

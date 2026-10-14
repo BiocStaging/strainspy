@@ -51,7 +51,7 @@ If provided, taxonomy columns are appended to top hits.}
 \item{scale_continuous}{If \code{TRUE}, continuous metadata covariates are z-scored
 by \code{glmZiBFit()}.}
 
-\item{nthreads}{Number of threads for parallel processing (default: all available cores).}
+\item{nthreads}{Number of threads for parallel processing (default 2).}
 
 \item{return_vcov}{If \code{TRUE}, include per-feature variance-covariance matrices in fit.}
 

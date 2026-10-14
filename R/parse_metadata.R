@@ -2,7 +2,7 @@
 #'
 #' This function adds or modifies metadata in a `SummarizedExperiment` object.
 #' 
-#' If `convert = TRUE`, character columns with less than 5 unique (non-NA) values will be automatically
+#' If `convert = TRUE`, character columns with 5 or fewer unique (non-NA) values will be automatically
 #' converted to factors, with levels ordered alphabetically. For meaningful association testing,
 #' however, factor levels should reflect the intended reference level. It is recommended to
 #' manually convert such variables to factors with explicitly set levels *before* calling `modify_metadata()`.
@@ -35,11 +35,13 @@ modify_metadata <- function(se, meta_data, replace = FALSE, convert = TRUE) {
   if (length(dup_samples) > 0) {
     n_dups <- length(dup_samples)
     if (n_dups <= 10) {
-      stop("Duplicated samples found in meta_data ", paste(dup_samples, collapse = ", "))
+      dup_txt <- paste(dup_samples, collapse = ", ")
+      stop("Duplicated samples found in meta_data ", dup_txt)
     } else {
+      dup_txt <- paste(head(dup_samples, 10), collapse = ", ")
       stop(
         sprintf("There are %d duplicated samples in meta_data. Showing first 10:\n%s", 
-                n_dups, paste(head(dup_samples, 10), collapse = ", "))
+                n_dups, dup_txt)
       )
     }
   }
@@ -50,11 +52,13 @@ modify_metadata <- function(se, meta_data, replace = FALSE, convert = TRUE) {
   if (length(missing_from_meta <- setdiff(se_samples, meta_samples)) > 0) {
     n_missing <- length(missing_from_meta)
     if (n_missing <= 10) {
-      stop("No meta data available for `se` sample(s): ", paste(missing_from_meta, collapse = ", "))
+      missing_txt <- paste(missing_from_meta, collapse = ", ")
+      stop("No meta data available for `se` sample(s): ", missing_txt)
     } else {
+      missing_txt <- paste(head(missing_from_meta, 10), collapse = ", ")
       stop(
         sprintf("Meta data is absent for %d 'se' samples. Showing first 10:\n%s", 
-                n_missing, paste(head(missing_from_meta, 10), collapse = ", "))
+                n_missing, missing_txt)
       )
     }
   }
@@ -63,9 +67,10 @@ modify_metadata <- function(se, meta_data, replace = FALSE, convert = TRUE) {
   if (convert) {
     meta_data <- auto_coerce_metadata_types(meta_data)
   } else {
-    char_cols <- names(meta_data)[sapply(meta_data, is.character)]
+    char_cols <- names(meta_data)[vapply(meta_data, is.character, logical(1))]
     if (length(char_cols) > 0) {
-      warning("Character columns detected (", paste(char_cols, collapse = ", "),
+      char_txt <- paste(char_cols, collapse = ", ")
+      warning("Character columns detected (", char_txt,
               "). Consider converting to factors for modeling.")
     }
   }
@@ -80,12 +85,13 @@ modify_metadata <- function(se, meta_data, replace = FALSE, convert = TRUE) {
     SummarizedExperiment::colData(se) <- meta_data_cols
   } else {
     # Extract coldata
-    cd = SummarizedExperiment::colData(se)
+    cd <- SummarizedExperiment::colData(se)
     # Drop duplicate columns from meta_data_cols
     shared_cols <- intersect(colnames(meta_data_cols), colnames(cd))
     if (length(shared_cols) > 0) {
+      shared_txt <- paste(shared_cols, collapse = ", ")
       warning("The following metadata columns already exist in `se` and will not be modified. To replace with provided meta_data, set run again with `replace = TRUE`:\n\n",
-              paste(shared_cols, collapse = ", "))
+              shared_txt)
     }
     
     new_colnames <- setdiff(colnames(meta_data_cols), shared_cols)
@@ -109,7 +115,7 @@ modify_metadata <- function(se, meta_data, replace = FALSE, convert = TRUE) {
 #' It performs the following:
 #' - Converts all integer columns to numeric.
 #' - Converts character columns to numeric if they contain only numeric-like strings.
-#' - Converts character columns to factors if they have fewer than `factor_threshold` unique (non-NA) values.
+#' - Converts character columns to factors if they have at most `factor_threshold` unique (non-NA) values.
 #' - Leaves all other character columns unchanged.
 #' Missing values (NAs) are preserved throughout.
 #'

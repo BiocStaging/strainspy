@@ -8,16 +8,16 @@ testthat::test_that("glmZiBFit parallel backend matches the serial fit", {
   )
 
   testthat::expect_s4_class(parallel, "strainspy_fit")
-  testthat::expect_equal(nrow(parallel@coefficients), 6)
+  testthat::expect_equal(nrow(getCoefficients(parallel)), 6)
 
   # Preset priors depend only on the design, so per-row fits are independent
   # of which other rows are present: the parallel fit must reproduce the
   # cached serial fit exactly
-  for (col in colnames(parallel@coefficients)) {
-    testthat::expect_equal(parallel@coefficients[[col]],
-                           serial@coefficients[[col]][1:6])
-    testthat::expect_equal(parallel@p_values[[col]],
-                           serial@p_values[[col]][1:6])
+  for (col in colnames(getCoefficients(parallel))) {
+    testthat::expect_equal(getCoefficients(parallel)[[col]],
+                           getCoefficients(serial)[[col]][1:6])
+    testthat::expect_equal(getPValues(parallel)[[col]],
+                           getPValues(serial)[[col]][1:6])
   }
 })
 
@@ -34,11 +34,11 @@ testthat::test_that("glmZiBFit gamlss backend agrees with glmmTMB", {
   )
 
   testthat::expect_s4_class(fit_g, "strainspy_fit")
-  testthat::expect_equal(nrow(fit_g@coefficients), length(rows))
-  testthat::expect_true(all(fit_g@convergence))
-  testthat::expect_true(all(fit_g@coefficients$Case_statusPD < 0))
-  testthat::expect_equal(fit_g@coefficients$Case_statusPD,
-                         s$fit@coefficients$Case_statusPD[rows],
+  testthat::expect_equal(nrow(getCoefficients(fit_g)), length(rows))
+  testthat::expect_true(all(getConvergence(fit_g)))
+  testthat::expect_true(all(getCoefficients(fit_g)$Case_statusPD < 0))
+  testthat::expect_equal(getCoefficients(fit_g)$Case_statusPD,
+                         getCoefficients(s$fit)$Case_statusPD[rows],
                          tolerance = 1e-2)
 })
 

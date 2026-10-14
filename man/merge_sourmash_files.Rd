@@ -14,7 +14,7 @@ merge_sourmash_files(
 \arguments{
 \item{sourmash_files}{A character vector of file paths to merge.}
 
-\item{manifest_file}{If one or several indexed databases were used for searching or gathering, required genome column can be missing.
+\item{manifest_file}{If one or several indexed databases were used for searching or gathering, the required genome column can be missing.
 The path to the output of \verb{sourmash sig manifest} can be provided to try and add back the data automatically (Default = NULL).
 If provided, columns \code{md5}, \code{name} and \code{filename} are required.  This function uses \code{name} and \code{md5} to match the manifest data with sourmash outputs.
 In the final output, \code{filename} will be used to identify each hit. If the \code{filename} is a path, the basename without extensions will be used instead.}

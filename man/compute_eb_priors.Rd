@@ -11,26 +11,26 @@ compute_eb_priors(
   BPPARAM = NULL,
   low_cutoff = 0.1,
   high_cutoff = 10,
-  est_disperion_prior = FALSE,
+  est_dispersion_prior = FALSE,
   progress = TRUE
 )
 }
 \arguments{
-\item{se}{A \code{SummarizedExperiment} object with count matrix and colData.}
+\item{se}{A \code{SummarizedExperiment} object with the assay matrix and colData.}
 
 \item{design}{A fixed-effects-only formula (e.g., ~ group + age + sex).}
 
 \item{nthreads}{An integer specifying the number of (CPUs or workers) to use. Defaults
-to one 1.}
+to 1.}
 
 \item{BPPARAM}{Optional \code{BiocParallelParam} object. If not provided, the function
 will configure an appropriate backend automatically.}
 
-\item{low_cutoff}{Ceiling for small SD estimates. Default 0.1}
+\item{low_cutoff}{Floor for small SD estimates; values below it are raised to it. Default 0.1}
 
-\item{high_cutoff}{Floor for large SD estimates. Default 10}
+\item{high_cutoff}{Ceiling for large SD estimates; values above it are capped at it. Default 10}
 
-\item{est_disperion_prior}{Estimate a prior for disperion (default = FALSE)}
+\item{est_dispersion_prior}{Estimate a prior for dispersion (default = FALSE)}
 
 \item{progress}{Logical. If \code{TRUE} (default), progress bars and progress messages are printed. Set to \code{FALSE} to silence them.}
 }
@@ -39,7 +39,7 @@ An object of class \code{strainspy_priors}.
 }
 \description{
 Fits fast binomial and beta models to estimate MAP prior SDs for use in
-zero-inflated and ordinal beta models fitted using \code{GLMMTMB}.
+zero-inflated and ordinal beta models fitted using \code{glmmTMB}.
 }
 \examples{
 if (requireNamespace("fastglm", quietly = TRUE) && 
